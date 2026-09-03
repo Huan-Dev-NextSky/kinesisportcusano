@@ -17,9 +17,9 @@ $order_client_info->conn=$conn;
                 <h1 class="panel-title"><?php echo $label_language_values['customers'];?></h1>
             </div>
 			<div class="panel-body">
-				<ul class="nav nav-tabs">
-					<li class="active"><a data-toggle="tab" href="#registered-customers-listing"><?php echo $label_language_values['registered_customers'];?></a></li>
-					<li><a data-toggle="tab" href="#guest-customers-listing"><?php echo $label_language_values['guest_customers'];?></a></li>
+				<ul class="nav nav-tabs ct-segment-tabs">
+					<li class="active"><a data-toggle="tab" href="#registered-customers-listing"><i class="fa fa-users"></i><?php echo $label_language_values['registered_customers'];?></a></li>
+					<li><a data-toggle="tab" href="#guest-customers-listing"><i class="fa fa-user"></i><?php echo $label_language_values['guest_customers'];?></a></li>
 				</ul>
 				<div class="tab-content">
 					<div id="registered-customers-listing" class="tab-pane fade in active">

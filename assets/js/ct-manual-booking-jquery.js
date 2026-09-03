@@ -608,123 +608,125 @@ jQuery(document).ready(function () {
     var notes_check = check_notes;
     console.log(check_addresss);
     /* validation condition*/
-    jQuery("#user_details_form").validate();
-    if (appoint_details.status == "on") {
-        if (check_addresss.statuss == "on" && check_addresss.required == "Y") {
-            jQuery("#app-street-address").rules("add",
+    if (jQuery("#user_details_form").length > 0) {
+        jQuery("#user_details_form").validate();
+        if (appoint_details.status == "on") {
+            if (check_addresss.statuss == "on" && check_addresss.required == "Y") {
+                jQuery("#app-street-address").rules("add",
+                    {
+                        required: true, minlength: check_addresss.min, maxlength: check_addresss.max,
+                        messages: { required: errorobj_req_sa, minlength: errorobj_min_sa, maxlength: errorobj_max_sa }
+                    });
+            }
+
+            if (check_zip_code.statuss == "on" && check_zip_code.required == "Y") {
+                jQuery("#app-zip-code").rules("add", { required: true, minlength: check_zip_code.min, maxlength: check_zip_code.max, messages: { required: errorobj_req_zc, minlength: errorobj_min_zc, maxlength: errorobj_max_zc } });
+            }
+
+            if (check_city.statuss == "on" && check_city.required == "Y") {
+                jQuery("#app-city").rules("add",
+                    {
+                        required: true, minlength: check_city.min, maxlength: check_city.max,
+                        messages: { required: errorobj_req_ct, minlength: errorobj_min_ct, maxlength: errorobj_max_ct }
+                    });
+            }
+
+            if (check_state.statuss == "on" && check_state.required == "Y") {
+                jQuery("#app-state").rules("add",
+                    {
+                        required: true, minlength: check_state.min, maxlength: check_state.max,
+                        messages: {
+                            required: errorobj_req_st, minlength: errorobj_min_st, maxlength: errorobj_max_st
+                        }
+                    });
+            }
+        }
+
+        if (fn_check.statuss == "on" && fn_check.required == "Y") {
+            jQuery("#ct-first-name").rules("add",
                 {
-                    required: true, minlength: check_addresss.min, maxlength: check_addresss.max,
+                    required: true, minlength: fn_check.min, maxlength: fn_check.max,
+                    messages: { required: errorobj_req_fn, minlength: errorobj_min_fn, maxlength: errorobj_max_fn }
+                });
+        }
+
+        if (ln_check.statuss == "on" && ln_check.required == "Y") {
+            jQuery("#ct-last-name").rules("add",
+                {
+                    required: true, minlength: ln_check.min, maxlength: ln_check.max,
+                    messages: { required: errorobj_req_ln, minlength: errorobj_min_ln, maxlength: errorobj_max_ln }
+                });
+        }
+
+        if (phone_check.statuss == "on" && phone_check.required == "Y") {
+            jQuery("#ct-user-phone").rules("add",
+                {
+                    required: true, minlength: phone_check.min, maxlength: phone_check.max,
+                    messages: { required: errorobj_req_ph, minlength: errorobj_min_ph, maxlength: errorobj_max_ph }
+                });
+        }
+
+        if (address_check.statuss == "on" && address_check.required == "Y") {
+            jQuery("#ct-street-address").rules("add",
+                {
+                    required: true, minlength: address_check.min, maxlength: address_check.max,
                     messages: { required: errorobj_req_sa, minlength: errorobj_min_sa, maxlength: errorobj_max_sa }
                 });
         }
 
-        if (check_zip_code.statuss == "on" && check_zip_code.required == "Y") {
-            jQuery("#app-zip-code").rules("add", { required: true, minlength: check_zip_code.min, maxlength: check_zip_code.max, messages: { required: errorobj_req_zc, minlength: errorobj_min_zc, maxlength: errorobj_max_zc } });
+        if (zip_check.statuss == "on" && zip_check.required == "Y") {
+            jQuery("#ct-zip-code").rules("add",
+                {
+                    required: true, minlength: zip_check.min, maxlength: zip_check.max,
+                    messages: { required: errorobj_req_zc, minlength: errorobj_min_zc, maxlength: errorobj_max_zc }
+                });
         }
 
-        if (check_city.statuss == "on" && check_city.required == "Y") {
-            jQuery("#app-city").rules("add",
+        if (city_check.statuss == "on" && city_check.required == "Y") {
+            jQuery("#ct-city").rules("add",
                 {
-                    required: true, minlength: check_city.min, maxlength: check_city.max,
+                    required: true, minlength: city_check.min, maxlength: city_check.max,
                     messages: { required: errorobj_req_ct, minlength: errorobj_min_ct, maxlength: errorobj_max_ct }
                 });
         }
 
-        if (check_state.statuss == "on" && check_state.required == "Y") {
-            jQuery("#app-state").rules("add",
+        if (state_check.statuss == "on" && state_check.required == "Y") {
+            jQuery("#ct-state").rules("add",
                 {
-                    required: true, minlength: check_state.min, maxlength: check_state.max,
-                    messages: {
-                        required: errorobj_req_st, minlength: errorobj_min_st, maxlength: errorobj_max_st
-                    }
+                    required: true, minlength: state_check.min, maxlength: state_check.max,
+                    messages: { required: errorobj_req_st, minlength: errorobj_min_st, maxlength: errorobj_max_st }
                 });
         }
-    }
 
-    if (fn_check.statuss == "on" && fn_check.required == "Y") {
-        jQuery("#ct-first-name").rules("add",
-            {
-                required: true, minlength: fn_check.min, maxlength: fn_check.max,
-                messages: { required: errorobj_req_fn, minlength: errorobj_min_fn, maxlength: errorobj_max_fn }
-            });
-    }
+        if (notes_check.statuss == "on" && notes_check.required == "Y") {
+            jQuery("#ct-notes").rules("add",
+                {
+                    required: true, minlength: notes_check.min, maxlength: notes_check.max,
+                    messages: { required: errorobj_req_srn, minlength: errorobj_min_srn, maxlength: errorobj_max_srn }
+                });
+        }
 
-    if (ln_check.statuss == "on" && ln_check.required == "Y") {
-        jQuery("#ct-last-name").rules("add",
-            {
-                required: true, minlength: ln_check.min, maxlength: ln_check.max,
-                messages: { required: errorobj_req_ln, minlength: errorobj_min_ln, maxlength: errorobj_max_ln }
-            });
-    }
+        if (password_check.statuss == "on" && password_check.required == "Y") {
+            jQuery("#ct-preffered-pass").rules("add",
+                {
+                    required: true, minlength: password_check.min, maxlength: password_check.max,
+                    messages: { required: errorobj_please_enter_password, minlength: errorobj_min_ps, maxlength: errorobj_max_ps }
+                });
 
-    if (phone_check.statuss == "on" && phone_check.required == "Y") {
-        jQuery("#ct-user-phone").rules("add",
-            {
-                required: true, minlength: phone_check.min, maxlength: phone_check.max,
-                messages: { required: errorobj_req_ph, minlength: errorobj_min_ph, maxlength: errorobj_max_ph }
-            });
-    }
-
-    if (address_check.statuss == "on" && address_check.required == "Y") {
-        jQuery("#ct-street-address").rules("add",
-            {
-                required: true, minlength: address_check.min, maxlength: address_check.max,
-                messages: { required: errorobj_req_sa, minlength: errorobj_min_sa, maxlength: errorobj_max_sa }
-            });
-    }
-
-    if (zip_check.statuss == "on" && zip_check.required == "Y") {
-        jQuery("#ct-zip-code").rules("add",
-            {
-                required: true, minlength: zip_check.min, maxlength: zip_check.max,
-                messages: { required: errorobj_req_zc, minlength: errorobj_min_zc, maxlength: errorobj_max_zc }
-            });
-    }
-
-    if (city_check.statuss == "on" && city_check.required == "Y") {
-        jQuery("#ct-city").rules("add",
-            {
-                required: true, minlength: city_check.min, maxlength: city_check.max,
-                messages: { required: errorobj_req_ct, minlength: errorobj_min_ct, maxlength: errorobj_max_ct }
-            });
-    }
-
-    if (state_check.statuss == "on" && state_check.required == "Y") {
-        jQuery("#ct-state").rules("add",
-            {
-                required: true, minlength: state_check.min, maxlength: state_check.max,
-                messages: { required: errorobj_req_st, minlength: errorobj_min_st, maxlength: errorobj_max_st }
-            });
-    }
-
-    if (notes_check.statuss == "on" && notes_check.required == "Y") {
-        jQuery("#ct-notes").rules("add",
-            {
-                required: true, minlength: notes_check.min, maxlength: notes_check.max,
-                messages: { required: errorobj_req_srn, minlength: errorobj_min_srn, maxlength: errorobj_max_srn }
-            });
-    }
-
-    if (password_check.statuss == "on" && password_check.required == "Y") {
-        jQuery("#ct-preffered-pass").rules("add",
-            {
-                required: true, minlength: password_check.min, maxlength: password_check.max,
-                messages: { required: errorobj_please_enter_password, minlength: errorobj_min_ps, maxlength: errorobj_max_ps }
-            });
-
-        jQuery("#ct-email").rules("add",
-            {
-                required: true, email: true, remote: {
-                    url: front_url + "manual_booking_firststep.php",
-                    type: "POST",
-                    async: false,
-                    data: {
-                        email: function () { return jQuery("#ct-email").val(); },
-                        action: "check_user_email"
-                    }
-                },
-                messages: { required: errorobj_please_enter_email_address, email: errorobj_please_enter_valid_email_address, remote: errorobj_email_already_exists }
-            });
+            jQuery("#ct-email").rules("add",
+                {
+                    required: true, email: true, remote: {
+                        url: front_url + "manual_booking_firststep.php",
+                        type: "POST",
+                        async: false,
+                        data: {
+                            email: function () { return jQuery("#ct-email").val(); },
+                            action: "check_user_email"
+                        }
+                    },
+                    messages: { required: errorobj_please_enter_email_address, email: errorobj_please_enter_valid_email_address, remote: errorobj_email_already_exists }
+                });
+        }
     }
     /* end validation condition*/
 

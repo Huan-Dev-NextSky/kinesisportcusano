@@ -20,12 +20,12 @@ $time_format = $setting->get_option('ct_time_format'); ?>
 <div id="cta-staff-panel" class="panel tab-content">	
 	<div class="panel-body">        
 		<hr id="hr"/>        
-		<ul class="nav nav-tabs nav-justified ct-staff-right-menu">            
-			<li class="active"><a href="#member-details" data-toggle="tab"><?php echo $label_language_values['view_slots_by']; ?></a></li>            
-			<li><a href="#member-availabilty" class="availability" data-toggle="tab"><?php echo $label_language_values['availabilty']; ?></a></li>            
-			<li><a href="#member-addbreaks" data-toggle="tab"><?php echo $label_language_values['add_breaks']; ?></a></li>            
-			<li><a href="#member-offtime" data-toggle="tab" class="myoff_timeslink"><?php echo $label_language_values['off_time']; ?></a></li>            
-			<li><a href="#member-offdays" data-toggle="tab"><?php echo $label_language_values['off_days']; ?></a></li>        
+		<ul class="nav nav-tabs nav-justified ct-staff-right-menu ct-segment-tabs">            
+			<li class="active"><a href="#member-details" data-toggle="tab"><i class="fa fa-sliders"></i><?php echo $label_language_values['view_slots_by']; ?></a></li>            
+			<li><a href="#member-availabilty" class="availability" data-toggle="tab"><i class="fa fa-clock-o"></i><?php echo $label_language_values['availabilty']; ?></a></li>            
+			<li><a href="#member-addbreaks" data-toggle="tab"><i class="fa fa-coffee"></i><?php echo $label_language_values['add_breaks']; ?></a></li>            
+			<li><a href="#member-offtime" data-toggle="tab" class="myoff_timeslink"><i class="fa fa-ban"></i><?php echo $label_language_values['off_time']; ?></a></li>            
+			<li><a href="#member-offdays" data-toggle="tab"><i class="fa fa-calendar-times-o"></i><?php echo $label_language_values['off_days']; ?></a></li>        
 		</ul>        
 		<div class="tab-pane active"> <!-- first staff nmember -->            
 			<div class="container-fluid tab-content ct-staff-right-details">                

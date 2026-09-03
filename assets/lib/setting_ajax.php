@@ -280,6 +280,176 @@ if(isset($_POST['action']) && $_POST['action']=='update_xero_setting'){
     echo "Record Not Added";
   }
 }
+
+/* Kinesis API Settings Actions */
+if(isset($_POST['action']) && $_POST['action']=='update_kinesis_setting'){
+  require_once(dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwApiMigration.php');
+  require_once(dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwApiClient.php');
+  AwwApiMigration::run($conn);
+
+  $prevEnv = $setting->get_option('kinesis_api_env');
+  $prevUser = $setting->get_option('kinesis_api_username');
+  $prevPass = $setting->get_option('kinesis_api_password');
+
+  $labels_option = array(
+    'kinesis_api_status' => isset($_POST['status']) ? $_POST['status'] : 'N',
+    'kinesis_api_env' => isset($_POST['env']) ? $_POST['env'] : 'sandbox',
+    'kinesis_api_username' => isset($_POST['username']) ? trim($_POST['username']) : '',
+    'kinesis_api_password' => isset($_POST['password']) ? trim($_POST['password']) : '',
+    'kinesis_sync_interval' => isset($_POST['interval']) ? trim($_POST['interval']) : '5'
+  );
+
+  // Keep existing password when UI posts empty (unchanged)
+  if ($labels_option['kinesis_api_password'] === '' && $prevPass !== '') {
+    $labels_option['kinesis_api_password'] = $prevPass;
+  }
+
+  $credsChanged = (
+    (string)$prevEnv !== (string)$labels_option['kinesis_api_env']
+    || (string)$prevUser !== (string)$labels_option['kinesis_api_username']
+    || (string)$prevPass !== (string)$labels_option['kinesis_api_password']
+  );
+
+  foreach($labels_option as $option_key => $option_value){
+      $setting->set_option($option_key, $option_value);
+  }
+
+  if ($credsChanged) {
+    $client = new AwwApiClient($conn);
+    $client->clearTokens();
+  }
+
+  echo "updated";
+  exit;
+}
+
+if(isset($_POST['action']) && $_POST['action']=='test_kinesis_connection'){
+  require_once(dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwApiClient.php');
+  
+  $env = isset($_POST['env']) ? $_POST['env'] : null;
+  $username = isset($_POST['username']) ? trim($_POST['username']) : null;
+  $password = isset($_POST['password']) ? trim($_POST['password']) : null;
+
+  $client = new AwwApiClient($conn, $env, $username, $password);
+  $res = $client->testConnection();
+  
+  header('Content-Type: application/json');
+  echo json_encode($res);
+  exit;
+}
+
+if(isset($_POST['action']) && $_POST['action']=='sync_kinesis_services'){
+  require_once(dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwServiceSync.php');
+  
+  $sync = new AwwServiceSync($conn);
+  $res = $sync->syncAll();
+  
+  header('Content-Type: application/json');
+  echo json_encode($res);
+  exit;
+}
+
+if(isset($_POST['action']) && $_POST['action']=='sync_gcal_to_system'){
+  require_once(dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwGCalSync.php');
+  
+  $sync = new AwwGCalSync($conn);
+  $daysPast = isset($_POST['days_past']) ? (int)$_POST['days_past'] : 7;
+  $daysFuture = isset($_POST['days_future']) ? (int)$_POST['days_future'] : 60;
+  $res = $sync->syncAll($daysPast, $daysFuture);
+  
+  header('Content-Type: application/json');
+  echo json_encode($res);
+  exit;
+}
+
+if(isset($_POST['action']) && $_POST['action']=='sync_system_to_kinesis'){
+  require_once(dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwAppointmentSync.php');
+  
+  $sync = new AwwAppointmentSync($conn);
+  $res = $sync->syncAllPending();
+  
+  header('Content-Type: application/json');
+  echo json_encode($res);
+  exit;
+}
+
+if(isset($_POST['action']) && $_POST['action']=='get_sync_history'){
+  require_once(dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwApiMigration.php');
+  AwwApiMigration::run($conn);
+  
+  $type = isset($_POST['type']) ? trim($_POST['type']) : 'all';
+  $status = isset($_POST['status']) ? trim($_POST['status']) : 'all';
+  $search = isset($_POST['search']) ? mysqli_real_escape_string($conn, trim($_POST['search'])) : '';
+  $limit = isset($_POST['limit']) ? max(5, min(200, (int)$_POST['limit'])) : 50;
+
+  $where = array();
+  if ($status !== 'all' && $status !== '') {
+    $where[] = "s.`sync_status` = '" . mysqli_real_escape_string($conn, $status) . "'";
+  }
+  if ($type === 'gcal') {
+    $where[] = "(s.`google_event_id` IS NOT NULL AND s.`google_event_id` != '')";
+  } elseif ($type === 'kinesis') {
+    $where[] = "(s.`kinesis_appointment_id` IS NOT NULL OR s.`sync_action` = 'CREATE' OR s.`sync_action` = 'UPDATE' OR s.`sync_action` = 'CANCEL')";
+  }
+  if ($search !== '') {
+    $where[] = "(s.`customer_name` LIKE '%{$search}%' OR s.`customer_email` LIKE '%{$search}%' OR s.`customer_phone` LIKE '%{$search}%' OR s.`local_order_id` LIKE '%{$search}%' OR s.`google_event_id` LIKE '%{$search}%' OR s.`kinesis_appointment_id` LIKE '%{$search}%' OR s.`event_summary` LIKE '%{$search}%')";
+  }
+
+  $whereSql = count($where) > 0 ? "WHERE " . implode(' AND ', $where) : "";
+  $query = "SELECT s.*, b.booking_status, b.booking_date_time, b.kinesis_sync_status as booking_kinesis_status, srv.title as service_name, adm.fullname as staff_name
+            FROM `ct_gcal_kinesis_sync` s
+            LEFT JOIN `ct_bookings` b ON (s.local_order_id = b.order_id OR s.local_booking_id = b.id)
+            LEFT JOIN `ct_services` srv ON (s.service_id = srv.id OR s.service_id = srv.external_service_id)
+            LEFT JOIN `ct_admin_info` adm ON s.employee_id = adm.id
+            {$whereSql}
+            GROUP BY s.id
+            ORDER BY s.updated_at DESC, s.id DESC
+            LIMIT {$limit}";
+
+  $res = mysqli_query($conn, $query);
+  $logs = array();
+  if ($res) {
+    while ($row = mysqli_fetch_assoc($res)) {
+      $logs[] = $row;
+    }
+  }
+
+  // Count stats
+  $statsQuery = "SELECT 
+    COUNT(*) as total_count,
+    COALESCE(SUM(CASE WHEN `sync_status` = 'SYNCED' THEN 1 ELSE 0 END), 0) as synced_count,
+    COALESCE(SUM(CASE WHEN `sync_status` = 'PENDING' THEN 1 ELSE 0 END), 0) as pending_count,
+    COALESCE(SUM(CASE WHEN `sync_status` = 'CANCELLED' THEN 1 ELSE 0 END), 0) as cancelled_count,
+    COALESCE(SUM(CASE WHEN `google_event_id` IS NOT NULL AND `google_event_id` != '' THEN 1 ELSE 0 END), 0) as gcal_count,
+    COALESCE(SUM(CASE WHEN `kinesis_appointment_id` IS NOT NULL AND `kinesis_appointment_id` > 0 THEN 1 ELSE 0 END), 0) as kinesis_count
+    FROM `ct_gcal_kinesis_sync`";
+  $statsRes = mysqli_query($conn, $statsQuery);
+  $stats = $statsRes ? mysqli_fetch_assoc($statsRes) : array();
+
+  header('Content-Type: application/json');
+  echo json_encode(array(
+    'success' => true,
+    'count' => count($logs),
+    'stats' => $stats,
+    'logs' => $logs
+  ));
+  exit;
+}
+
+if(isset($_POST['action']) && $_POST['action']=='sync_single_order_to_kinesis'){
+  require_once(dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwAppointmentSync.php');
+  $orderId = isset($_POST['order_id']) ? (int)$_POST['order_id'] : 0;
+  if ($orderId > 0) {
+    $sync = new AwwAppointmentSync($conn);
+    $res = $sync->syncSingleBooking($orderId);
+    header('Content-Type: application/json');
+    echo json_encode($res);
+    exit;
+  }
+  header('Content-Type: application/json');
+  echo json_encode(array('success' => false, 'error' => 'Invalid order ID'));
+  exit;
+}
 if(isset($_POST['ct_google_analytics_code'])){
 	if(isset($_FILES)){
 		if($_FILES['ct_seo_og_image']['name'] != ''){
@@ -512,6 +682,9 @@ elseif(isset($_POST['action']) && $_POST['action']=='update_general_setting'){
       'ct_service_padding_time_after'=>$_POST['service_padding_time_after'],
       'ct_cancellation_buffer_time'=>$_POST['cancelled_buffer_time'],
       'ct_reshedule_buffer_time'=>$_POST['reshedule_buffer_time'],
+      'ct_allow_customer_cancel'=>isset($_POST['allow_customer_cancel']) ? $_POST['allow_customer_cancel'] : 'Y',
+      'ct_allow_customer_reschedule'=>isset($_POST['allow_customer_reschedule']) ? $_POST['allow_customer_reschedule'] : 'Y',
+      'ct_allow_manual_booking'=>isset($_POST['allow_manual_booking']) ? $_POST['allow_manual_booking'] : 'Y',
       'ct_currency'=>$_POST['currency'],
       'ct_currency_symbol_position'=>$_POST['currency_symbol_position'],
       'ct_service_design'=>$_POST['ct_service_design'],
@@ -1036,15 +1209,15 @@ elseif(isset($_POST['get_all_labels'])){
 			<input class="cta-toggle-checkbox2 language_status_change" data-id="<?php echo $lang; ?>" data-toggle="toggle" data-size="small" type='checkbox' name="language_status" <?php if($langarr[7] == "Y"){echo 'checked';} ?> data-on="<?php echo $label_language_values['enable'];?>" data-off="<?php echo $label_language_values['disable'];?>" data-onstyle='success' data-offstyle='danger' />
 		</div>
 		
-		<ul class="nav nav-tabs">
-			<li class="active"><a data-toggle="tab" href="#detail_spssfront"><?php echo $label_language_values['frontend_labels'];?></a></li>
-			<li><a data-toggle="tab" href="#detail_spssadmin"><?php echo $label_language_values['admin_labels'];?></a></li>
-			<li><a data-toggle="tab" href="#detail_spsserror"><?php echo $label_language_values['errors'];?></a></li>
-			<li><a data-toggle="tab" href="#detail_spssextra"><?php echo $label_language_values['extra_labels'];?></a></li>
+		<ul class="nav nav-tabs ct-segment-tabs">
+			<li class="active"><a data-toggle="tab" href="#detail_spssfront"><i class="fa fa-desktop"></i><?php echo $label_language_values['frontend_labels'];?></a></li>
+			<li><a data-toggle="tab" href="#detail_spssadmin"><i class="fa fa-cog"></i><?php echo $label_language_values['admin_labels'];?></a></li>
+			<li><a data-toggle="tab" href="#detail_spsserror"><i class="fa fa-exclamation-triangle"></i><?php echo $label_language_values['errors'];?></a></li>
+			<li><a data-toggle="tab" href="#detail_spssextra"><i class="fa fa-plus-circle"></i><?php echo $label_language_values['extra_labels'];?></a></li>
 			<?php  if($langarr[6] == ''){ ?>
-				<li><a data-toggle="tab" href="#detail_spsfront_error"><?php echo $label_language_values['front_error_labels'];?></a></li>
+				<li><a data-toggle="tab" href="#detail_spsfront_error"><i class="fa fa-warning"></i><?php echo $label_language_values['front_error_labels'];?></a></li>
 			<?php  } ?>
-			<li><a data-toggle="tab" href="#detail_spssapp"><?php echo $label_language_values['app_labels'];?></a></li>
+			<li><a data-toggle="tab" href="#detail_spssapp"><i class="fa fa-mobile"></i><?php echo $label_language_values['app_labels'];?></a></li>
 		</ul>
 		<div class="tab-content">
 			<div id="detail_spssfront" class="tab-pane fade in active">
@@ -1253,13 +1426,13 @@ elseif(isset($_POST['get_all_labels'])){
 		<div class="language_status" data-id="<?php echo $lang; ?>">
 			<input class="cta-toggle-checkbox2"  data-id="<?php echo $lang; ?>" data-toggle="toggle" data-size="small"  type='checkbox' name="language_status" data-on="<?php echo $label_language_values['enable'];?>" data-off="<?php echo $label_language_values['disable'];?>"  data-onstyle='success' data-offstyle='danger' />
 		</div> 
-		<ul class="nav nav-tabs">
-			<li class="active"><a data-toggle="tab" href="#detail_spssfront"><?php echo $label_language_values['frontend_labels'];?></a></li>
-			<li><a data-toggle="tab" href="#detail_spssadmin"><?php echo $label_language_values['admin_labels'];?></a></li>
-			<li><a data-toggle="tab" href="#detail_spsserror"><?php echo $label_language_values['errors'];?></a></li>
-			<li><a data-toggle="tab" href="#detail_spssextra"><?php echo $label_language_values['extra_labels'];?></a></li>
-			<li><a data-toggle="tab" href="#detail_spsfront_error"><?php echo $label_language_values['front_error_labels'];?></a></li>
-			<li><a data-toggle="tab" href="#detail_spsapp"><?php echo $label_language_values['app_labels'];?></a></li>
+		<ul class="nav nav-tabs ct-segment-tabs">
+			<li class="active"><a data-toggle="tab" href="#detail_spssfront"><i class="fa fa-desktop"></i><?php echo $label_language_values['frontend_labels'];?></a></li>
+			<li><a data-toggle="tab" href="#detail_spssadmin"><i class="fa fa-cog"></i><?php echo $label_language_values['admin_labels'];?></a></li>
+			<li><a data-toggle="tab" href="#detail_spsserror"><i class="fa fa-exclamation-triangle"></i><?php echo $label_language_values['errors'];?></a></li>
+			<li><a data-toggle="tab" href="#detail_spssextra"><i class="fa fa-plus-circle"></i><?php echo $label_language_values['extra_labels'];?></a></li>
+			<li><a data-toggle="tab" href="#detail_spsfront_error"><i class="fa fa-warning"></i><?php echo $label_language_values['front_error_labels'];?></a></li>
+			<li><a data-toggle="tab" href="#detail_spsapp"><i class="fa fa-mobile"></i><?php echo $label_language_values['app_labels'];?></a></li>
 		</ul>
 		<div class="tab-content">
 			<div id="detail_spssfront" class="tab-pane fade in active">

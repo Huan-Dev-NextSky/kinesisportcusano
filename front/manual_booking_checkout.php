@@ -41,6 +41,11 @@ if(isset($_POST['action']) && $_POST['action']=='complete_booking'){
 	$setting = new cleanto_setting();
 	$setting->conn = $conn;
 
+	if ($setting->get_option('ct_allow_manual_booking') === 'N') {
+		echo 'manual_booking_disabled';
+		exit;
+	}
+
 	$booking=new cleanto_booking();
 	$booking->conn=$conn;
 	

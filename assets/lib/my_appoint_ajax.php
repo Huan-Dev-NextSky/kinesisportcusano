@@ -1,4 +1,5 @@
 <?php          
+require_once(dirname(__FILE__).'/ct_sms_opt_in.php');
 include(dirname(dirname(dirname(__FILE__)))."/objects/class_connection.php");
 include(dirname(dirname(dirname(__FILE__)))."/objects/class_dashboard.php");
 include(dirname(dirname(dirname(__FILE__)))."/header.php");
@@ -1297,7 +1298,7 @@ if(isset($_POST['getcleintdetailwith_updatereadstatus'])){
 	}
 	/* MESSAGEBIRD CODE */
 		if($settings->get_option("ct_sms_messagebird_status") == "Y"){
-			if ($settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
 				$template = $objdashboard->gettemplate_sms("CO", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E"){
@@ -1355,7 +1356,7 @@ if(isset($_POST['getcleintdetailwith_updatereadstatus'])){
 		}
 		
 	if ($settings->get_option("ct_sms_textlocal_status") == "Y") {
-		if ($settings->get_option("ct_sms_textlocal_send_sms_to_client_status") == "Y") {
+		if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option("ct_sms_textlocal_send_sms_to_client_status") == "Y") {
 			$template = $objdashboard->gettemplate_sms("CO", "C");
 			$phone = $client_phone;
 			if ($template[4] == "E") {
@@ -1400,7 +1401,7 @@ if(isset($_POST['getcleintdetailwith_updatereadstatus'])){
 		$p = new Plivo_RestAPI($auth_id, $auth_token, "", "");
 		$plivo_sender_number = $settings->get_option("ct_sms_plivo_sender_number");
 		$twilio_sender_number = $settings->get_option("ct_sms_twilio_sender_number");
-		if ($settings->get_option("ct_sms_plivo_send_sms_to_client_status") == "Y") {
+		if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option("ct_sms_plivo_send_sms_to_client_status") == "Y") {
 			$template = $objdashboard->gettemplate_sms("CO", "C");
 			$phone = $client_phone;
 			if ($template[4] == "E") {
@@ -1430,7 +1431,7 @@ if(isset($_POST['getcleintdetailwith_updatereadstatus'])){
 		}
 	}
 	if ($settings->get_option("ct_sms_twilio_status") == "Y") {
-		if ($settings->get_option("ct_sms_twilio_send_sms_to_client_status") == "Y") {
+		if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option("ct_sms_twilio_send_sms_to_client_status") == "Y") {
 			$template = $objdashboard->gettemplate_sms("CO", "C");
 			$phone = $client_phone;
 			if ($template[4] == "E") {
@@ -1458,7 +1459,7 @@ if(isset($_POST['getcleintdetailwith_updatereadstatus'])){
 		}
 	}
 	if ($settings->get_option("ct_nexmo_status") == "Y") {
-		if ($settings->get_option("ct_sms_nexmo_send_sms_to_client_status") == "Y") {
+		if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option("ct_sms_nexmo_send_sms_to_client_status") == "Y") {
 			$template = $objdashboard->gettemplate_sms("CO", "C");
 			$phone = $client_phone;
 			$phone = $client_phone;
@@ -1925,7 +1926,7 @@ if(isset($_POST['getcleintdetailwith_updatereadstatus'])){
 	/*GET APPROVED SMS TEMPLATE*/
 	/* MESSAGEBIRD CODE */
 		if($settings->get_option("ct_sms_messagebird_status") == "Y"){
-			if ($settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
 				$template = $objdashboard->gettemplate_sms("C",'C');
 				$phone = $client_phone;
 				if ($template[4] == "E"){
@@ -1983,7 +1984,7 @@ if(isset($_POST['getcleintdetailwith_updatereadstatus'])){
 		}
 	/* TEXTLOCAL CODE */
 	if($settings->get_option('ct_sms_textlocal_status') == "Y"){
-		if($settings->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
+		if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
 			$template = $objdashboard->gettemplate_sms("C",'C');
 			$phone = $client_phone;				
 			if($template[4] == "E") {
@@ -2049,7 +2050,7 @@ if(isset($_POST['getcleintdetailwith_updatereadstatus'])){
 	}
   /*PLIVO CODE*/
   if($settings->get_option('ct_sms_plivo_status')=="Y"){
-		if($settings->get_option('ct_sms_plivo_send_sms_to_client_status') == "Y"){
+		if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_plivo_send_sms_to_client_status') == "Y"){
       $auth_id = $settings->get_option('ct_sms_plivo_account_SID');
 			$auth_token = $settings->get_option('ct_sms_plivo_auth_token');
 			$p_client = new Plivo\RestAPI($auth_id, $auth_token, '', '');
@@ -2126,7 +2127,7 @@ if(isset($_POST['getcleintdetailwith_updatereadstatus'])){
 		}
   }
   if($settings->get_option('ct_sms_twilio_status') == "Y"){
-    if($settings->get_option('ct_sms_twilio_send_sms_to_client_status') == "Y"){
+    if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_twilio_send_sms_to_client_status') == "Y"){
 			$AccountSid = $settings->get_option('ct_sms_twilio_account_SID');
 			$AuthToken =  $settings->get_option('ct_sms_twilio_auth_token'); 
 			$twilliosms_client = new Services_Twilio($AccountSid, $AuthToken);
@@ -2192,7 +2193,7 @@ if(isset($_POST['getcleintdetailwith_updatereadstatus'])){
 		}
   }
 	if($settings->get_option('ct_nexmo_status') == "Y"){
-		if($settings->get_option('ct_sms_nexmo_send_sms_to_client_status') == "Y"){
+		if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_nexmo_send_sms_to_client_status') == "Y"){
 			$template = $objdashboard->gettemplate_sms("C",'C');
 			$phone = $client_phone;				
 			if($template[4] == "E") {
@@ -2671,7 +2672,7 @@ elseif(isset($_POST['confirm_booking_cal'])){
 	/*GET APPROVED SMS TEMPLATE*/
 	/* MESSAGEBIRD CODE */
 		if($settings->get_option("ct_sms_messagebird_status") == "Y"){
-			if ($settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
 				
 				$template = $objdashboard->gettemplate_sms("C",'C');
 				$phone = $client_phone;
@@ -2730,7 +2731,7 @@ elseif(isset($_POST['confirm_booking_cal'])){
 		}
 	/* TEXTLOCAL CODE */
 	if($settings->get_option('ct_sms_textlocal_status') == "Y"){
-		if($settings->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
+		if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
 			$template = $objdashboard->gettemplate_sms("C",'C');
 			$phone = $client_phone;				
 			if($template[4] == "E") {
@@ -2773,7 +2774,7 @@ elseif(isset($_POST['confirm_booking_cal'])){
 	}
   /*PLIVO CODE*/
   if($settings->get_option('ct_sms_plivo_status')=="Y"){
-    if($settings->get_option('ct_sms_plivo_send_sms_to_client_status') == "Y"){
+    if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_plivo_send_sms_to_client_status') == "Y"){
       $auth_id = $settings->get_option('ct_sms_plivo_account_SID');
 			$auth_token = $settings->get_option('ct_sms_plivo_auth_token');
 			$p_client = new Plivo\RestAPI($auth_id, $auth_token, '', '');
@@ -2823,7 +2824,7 @@ elseif(isset($_POST['confirm_booking_cal'])){
     }
   }
   if($settings->get_option('ct_sms_twilio_status') == "Y"){
-    if($settings->get_option('ct_sms_twilio_send_sms_to_client_status') == "Y"){
+    if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_twilio_send_sms_to_client_status') == "Y"){
 			$AccountSid = $settings->get_option('ct_sms_twilio_account_SID');
 			$AuthToken =  $settings->get_option('ct_sms_twilio_auth_token'); 
 			$twilliosms_client = new Services_Twilio($AccountSid, $AuthToken);
@@ -2865,7 +2866,7 @@ elseif(isset($_POST['confirm_booking_cal'])){
     }
   }
 	if($settings->get_option('ct_nexmo_status') == "Y"){
-		if($settings->get_option('ct_sms_nexmo_send_sms_to_client_status') == "Y"){
+		if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_nexmo_send_sms_to_client_status') == "Y"){
 			$template = $objdashboard->gettemplate_sms("C",'C');
 			$phone = $client_phone;				
 			if($template[4] == "E") {
@@ -3149,6 +3150,10 @@ elseif(isset($_POST['confirm_booking_cal'])){
 	$gc_event_id = $_POST['gc_event_id'];
 	$lastmodify = date('Y-m-d H:i:s');
 	$objdashboard->reject_bookings($id,$reason,$lastmodify);
+	@mysqli_query($conn, "UPDATE `ct_gcal_kinesis_sync` SET `sync_status` = 'CANCEL_PENDING', `sync_action` = 'CANCEL', `last_sync_message` = 'Rejected by admin', `updated_at` = NOW() WHERE `local_order_id` = " . (int)$id);
+	require_once(dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwAppointmentSync.php');
+	$kinesisSync = new AwwAppointmentSync($conn);
+	$kinesisSync->syncSingleBooking((int)$id);
 	$client_name = "";
 	$orderdetail = $objdashboard->getclientorder($id);
   	$clientdetail = $objdashboard->clientemailsender($id);
@@ -3466,7 +3471,7 @@ elseif(isset($_POST['confirm_booking_cal'])){
 	/*GET APPROVED SMS TEMPLATE*/
 	/* MESSAGEBIRD CODE */
 		if($settings->get_option("ct_sms_messagebird_status") == "Y"){
-			if ($settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
 				$template = $objdashboard->gettemplate_sms("R",'C');
 				$phone = $client_phone;
 				if ($template[4] == "E"){
@@ -3524,7 +3529,7 @@ elseif(isset($_POST['confirm_booking_cal'])){
 		}
 	/* TEXTLOCAL CODE */
 	if($settings->get_option('ct_sms_textlocal_status') == "Y"){
-		if($settings->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
+		if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
 			$template = $objdashboard->gettemplate_sms("R",'C');
 			$phone = $client_phone;				
 			if($template[4] == "E") {
@@ -3565,7 +3570,7 @@ elseif(isset($_POST['confirm_booking_cal'])){
 	}
 	/*PLIVO CODE*/
 	if($settings->get_option('ct_sms_plivo_status')=="Y"){
-    if($settings->get_option('ct_sms_plivo_send_sms_to_client_status') == "Y"){
+    if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_plivo_send_sms_to_client_status') == "Y"){
       $auth_id = $settings->get_option('ct_sms_plivo_account_SID');
 			$auth_token = $settings->get_option('ct_sms_plivo_auth_token');
 			$p_client = new Plivo\RestAPI($auth_id, $auth_token, '', '');
@@ -3614,7 +3619,7 @@ elseif(isset($_POST['confirm_booking_cal'])){
     }
   }
 	if($settings->get_option('ct_sms_twilio_status') == "Y"){
-		if($settings->get_option('ct_sms_twilio_send_sms_to_client_status') == "Y"){
+		if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_twilio_send_sms_to_client_status') == "Y"){
 			$AccountSid = $settings->get_option('ct_sms_twilio_account_SID');
 			$AuthToken =  $settings->get_option('ct_sms_twilio_auth_token'); 
 			$twilliosms_client = new Services_Twilio($AccountSid, $AuthToken);
@@ -3656,7 +3661,7 @@ elseif(isset($_POST['confirm_booking_cal'])){
     }
   }
 	if($settings->get_option('ct_nexmo_status') == "Y"){
-		if($settings->get_option('ct_sms_nexmo_send_sms_to_client_status') == "Y"){
+		if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_nexmo_send_sms_to_client_status') == "Y"){
 			$template = $objdashboard->gettemplate_sms("R",'C');
 			$phone = $client_phone;				
 			if($template[4] == "E") {
@@ -3836,6 +3841,10 @@ elseif(isset($_POST['confirm_booking_cal'])){
   /*SMS SENDING CODE END*/
 } 
 elseif(isset($_POST['delete_booking'])){
+  if (!isset($_SESSION['ct_adminid']) && !isset($_SESSION['ct_staffid'])) {
+    echo "0";
+    exit;
+  }
   $id = $_POST['id'];
 	$pid = $_POST['pid'];
 	$gc_event_id = $_POST['gc_event_id'];
@@ -3843,6 +3852,17 @@ elseif(isset($_POST['delete_booking'])){
 	if($gc_hook->gc_purchase_status() == 'exist'){
 		echo $gc_hook->gc_cancel_reject_booking_hook();
 	}
+  /* Cancel on Kinesis before hard-delete removes local mapping */
+  $orderEsc = (int)$id;
+  $kChk = @mysqli_query($conn, "SELECT `kinesis_appointment_id`, `kinesis_customer_id` FROM `ct_bookings` WHERE `order_id` = {$orderEsc} LIMIT 1");
+  $kRow = ($kChk && ($kr = mysqli_fetch_assoc($kChk))) ? $kr : null;
+  if ($kRow && !empty($kRow['kinesis_appointment_id'])) {
+    @mysqli_query($conn, "UPDATE `ct_bookings` SET `booking_status` = 'CS', `kinesis_sync_status` = 'CANCEL_PENDING' WHERE `order_id` = {$orderEsc}");
+    require_once(dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwAppointmentSync.php');
+    $kinesisSync = new AwwAppointmentSync($conn);
+    $kinesisSync->syncSingleBooking($orderEsc);
+  }
+  @mysqli_query($conn, "UPDATE `ct_gcal_kinesis_sync` SET `sync_status` = 'CANCELLED', `sync_action` = 'CANCEL', `last_sync_message` = 'Local booking deleted by admin', `updated_at` = NOW() WHERE `local_order_id` = {$orderEsc}");
   $objdashboard->delete_booking($id);
 }
 elseif(isset($_POST['delete_recurring_booking'])){

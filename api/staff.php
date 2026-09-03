@@ -7,7 +7,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "add_staff") {
 		$objadminprofile->fullname = ucwords($_POST["fullname"]);
 		$objadminprofile->email = $_POST["email"];
 		$objadminprofile->pass = $_POST["pass"];
-		$objadminprofile->role = "staff";
+		$objadminprofile->role = "doctor";
 		$count_exist_email = $objadminprofile->check_staff_email_existing();
 		if($count_exist_email > 0){
 			$invalid = ["status" => "false", "statuscode" => 404, "response" => $label_language_values["staff_already_exist"]];

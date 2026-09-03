@@ -230,6 +230,20 @@ function gc_settings_menu_content(){
 												</div>
 											</td>
 										</tr>";
+										$syncDir = $setting->get_option('ct_gc_sync_direction') ?: 'two_way';
+										$menu_content .= "<tr>
+											<td><label>Sync Direction</label></td>
+											<td>
+												<div class='form-group'>
+													<select class='form-control' id='ct_gc_sync_direction' style='width: 320px;'>
+														<option value='two_way' ".($syncDir == 'two_way' ? 'selected' : '').">Two-Way Sync (System &harr; Google Calendar)</option>
+														<option value='gcal_to_system' ".($syncDir == 'gcal_to_system' ? 'selected' : '').">One-Way Import (Google Calendar &rarr; System)</option>
+														<option value='system_to_gcal' ".($syncDir == 'system_to_gcal' ? 'selected' : '').">One-Way Export (System &rarr; Google Calendar)</option>
+													</select>
+													<a class='ct-tooltip-link' href='javascript:void(0)' data-toggle='tooltip' title='Choose synchronization direction between Google Calendar and the local system.'><i class='fa fa-info-circle fa-lg'></i></a>
+												</div>
+											</td>
+										</tr>";
 										if(sizeof((array)$calenders)==0){
 										$menu_content .= "<tr>
 											<td><label></label></td>
@@ -241,6 +255,10 @@ function gc_settings_menu_content(){
 											</td>
 										</tr>";
 										} else {
+										$gcalLastTime = $setting->get_option('gcal_last_sync_time') ?: 'Never';
+										$gcalLastStatus = $setting->get_option('gcal_last_sync_status') ?: 'Not synced yet';
+										$cronPath = dirname(dirname(dirname(__FILE__))) . '/cron/sync_gcal_to_system.php';
+
 										$menu_content .= "<tr>
 													<td>".$label_language_values['Select_Calendar']."</td>
 													<td><select name='ct_gc_ids' class='selectpicker' id='ct_gc_ids'>";
@@ -253,6 +271,30 @@ function gc_settings_menu_content(){
 														}
 													}
 													$menu_content .=  "</select> <a style='text-decoration:underline;color:#1E8CBE;' href='' id='ct_gc_disconnect'>".$label_language_values['Disconnect']."</a></td>
+												</tr>
+												<tr>
+													<td><label>Step 1: GCal &rarr; System</label></td>
+													<td>
+														<button type='button' class='btn btn-warning btn-sm' id='btn_sync_gcal_admin_now'>
+															<i class='fa fa-calendar-check-o'></i> Step 1: Sync Google Calendar &rarr; System Now
+														</button>
+														<div id='gcal_sync_admin_result' style='display:none; margin-top:8px;'></div>
+														<div style='margin-top: 6px;'>
+															<small class='text-muted'>
+																<strong>Last Sync:</strong> <span id='gcal_admin_last_time'>".$gcalLastTime."</span> | 
+																<span id='gcal_admin_last_status'>".$gcalLastStatus."</span>
+															</small>
+														</div>
+													</td>
+												</tr>
+												<tr>
+													<td><label>Step 1 Cronjob Command</label></td>
+													<td>
+														<div class='well well-sm' style='font-family: monospace; font-size: 12px; margin-bottom: 0; background-color: #f8f9fa;'>
+															*/5 * * * * php ".$cronPath." &gt; /dev/null 2&gt;&amp;1
+														</div>
+														<small class='text-muted'>Add this command to your server crontab (<code>crontab -e</code>) to automatically import reservations from Google Calendar into the local system every 5 minutes.</small>
+													</td>
 												</tr>";
 										}
 									$menu_content .=  "</tbody>
@@ -745,9 +787,11 @@ function gc_setting_configure_js() {
 		} else {
 			var ct_gc_status_sync_configure = 'N';
 		}
+		var ct_gc_sync_direction = jQuery('#ct_gc_sync_direction').val();
 		var datastring = {
 			ct_gc_status_configure: ct_gc_status_configure,
 			ct_gc_status_sync_configure: ct_gc_status_sync_configure,
+			ct_gc_sync_direction: ct_gc_sync_direction,
 			ct_gc_id: ct_gc_id,
 			'gc_setting_configure': 1
 		};
@@ -762,6 +806,124 @@ function gc_setting_configure_js() {
 			}
 		});
 	});
+
+	jQuery(document).on('click', '#btn_sync_gcal_admin_now', function (e) {
+		e.preventDefault();
+		var \$btn = jQuery(this);
+		var origHtml = \$btn.html();
+		\$btn.prop('disabled', true).html('<i class=\"fa fa-spinner fa-spin\"></i> Syncing Google Calendar &rarr; System...');
+
+		jQuery.ajax({
+			type: 'post',
+			url: ajax_url + 'setting_ajax.php',
+			dataType: 'json',
+			data: {
+				action: 'sync_gcal_to_system',
+				days_past: 7,
+				days_future: 60
+			},
+			success: function (res) {
+				\$btn.prop('disabled', false).html(origHtml);
+				if (res.success) {
+					jQuery('#gcal_sync_admin_result').removeClass('alert-danger alert-info').addClass('alert alert-success').html('<i class=\"fa fa-check-circle\"></i> ' + res.message).slideDown();
+					var nowStr = new Date().toISOString().slice(0, 19).replace('T', ' ');
+					jQuery('#gcal_admin_last_time').text(nowStr);
+					jQuery('#gcal_admin_last_status').text('SUCCESS (' + res.created + ' created, ' + res.updated + ' updated, ' + res.cancelled + ' cancelled)');
+					fetchGCalHistory();
+				} else {
+					jQuery('#gcal_sync_admin_result').removeClass('alert-success alert-info').addClass('alert alert-danger').html('<i class=\"fa fa-times-circle\"></i> ' + res.message).slideDown();
+				}
+			},
+			error: function () {
+				\$btn.prop('disabled', false).html(origHtml);
+				jQuery('#gcal_sync_admin_result').removeClass('alert-success alert-info').addClass('alert alert-danger').html('<i class=\"fa fa-exclamation-triangle\"></i> Error triggering Google Calendar sync.').slideDown();
+			}
+		});
+	});
+
+	function fetchGCalHistory() {
+		var \$tbody = jQuery('#gcal_sync_history_tbody');
+		\$tbody.html('<tr><td colspan=\"9\" class=\"text-center text-muted\" style=\"padding: 25px;\"><i class=\"fa fa-spinner fa-spin fa-2x\"></i><br /><span style=\"margin-top: 5px; display: inline-block;\">Loading Google Calendar import history...</span></td></tr>');
+
+		jQuery.ajax({
+			type: 'post',
+			url: ajax_url + 'setting_ajax.php',
+			dataType: 'json',
+			data: {
+				action: 'get_sync_history',
+				type: 'gcal',
+				status: 'all',
+				limit: 50
+			},
+			success: function (res) {
+				if (!res.success || !res.logs || res.logs.length === 0) {
+					\$tbody.html('<tr><td colspan=\"9\" class=\"text-center text-muted\" style=\"padding: 30px;\"><i class=\"fa fa-info-circle fa-2x\"></i><br />No Google Calendar import history found.</td></tr>');
+					return;
+				}
+
+				var html = '';
+				jQuery.each(res.logs, function (i, row) {
+					var syncTime = row.updated_at || row.created_at || '-';
+					var orderId = row.local_order_id ? ('#' + row.local_order_id) : (row.local_booking_id ? ('Bk #' + row.local_booking_id) : '-');
+					var custName = row.customer_name || 'Guest';
+					var custEmail = row.customer_email || '';
+					var custPhone = row.customer_phone || '';
+					var apptDates = (row.event_start || '-') + (row.event_end ? (' &rarr; ' + (row.event_end.indexOf(' ') !== -1 ? row.event_end.split(' ')[1] : row.event_end)) : '');
+					var summary = row.event_summary || row.service_name || 'Event';
+					var gcalId = row.google_event_id ? ('<span class=\"label label-info\" title=\"' + row.google_event_id + '\"><i class=\"fa fa-google\"></i> ' + (row.google_event_id.length > 12 ? (row.google_event_id.substring(0, 12) + '...') : row.google_event_id) + '</span>') : '-';
+
+					var actionBadge = '<span class=\"label label-default\">' + (row.sync_action || 'IMPORT') + '</span>';
+					if (row.sync_action === 'CREATE') {
+						actionBadge = '<span class=\"label label-success\">CREATE</span>';
+					} else if (row.sync_action === 'UPDATE') {
+						actionBadge = '<span class=\"label label-warning\">UPDATE</span>';
+					} else if (row.sync_action === 'CANCEL') {
+						actionBadge = '<span class=\"label label-danger\">CANCEL</span>';
+					}
+
+					var statusBadge = '<span class=\"label label-default\">' + (row.sync_status || 'UNKNOWN') + '</span>';
+					if (row.sync_status === 'SYNCED') {
+						statusBadge = '<span class=\"label label-success\"><i class=\"fa fa-check\"></i> SYNCED</span>';
+					} else if (row.sync_status === 'PENDING') {
+						statusBadge = '<span class=\"label label-warning\"><i class=\"fa fa-clock-o\"></i> PENDING</span>';
+					} else if (row.sync_status === 'CANCELLED') {
+						statusBadge = '<span class=\"label label-danger\"><i class=\"fa fa-ban\"></i> CANCELLED</span>';
+					}
+
+					var msg = row.last_sync_message || '-';
+
+					html += '<tr>' +
+						'<td style=\"white-space: nowrap;\"><small>' + syncTime + '</small></td>' +
+						'<td><strong>' + orderId + '</strong></td>' +
+						'<td><strong>' + custName + '</strong><br /><small class=\"text-muted\">' + custEmail + (custPhone ? (' | ' + custPhone) : '') + '</small></td>' +
+						'<td style=\"white-space: nowrap;\"><small>' + apptDates + '</small></td>' +
+						'<td>' + summary + '</td>' +
+						'<td>' + gcalId + '</td>' +
+						'<td>' + actionBadge + '</td>' +
+						'<td>' + statusBadge + '</td>' +
+						'<td><small>' + msg + '</small></td>' +
+						'</tr>';
+				});
+
+				\$tbody.html(html);
+			},
+			error: function () {
+				\$tbody.html('<tr><td colspan=\"9\" class=\"text-center text-danger\" style=\"padding: 25px;\"><i class=\"fa fa-exclamation-triangle\"></i> Failed to load Google Calendar history.</td></tr>');
+			}
+		});
+	}
+
+	jQuery(document).on('click', '#btn_refresh_gcal_history', function () {
+		fetchGCalHistory();
+	});
+
+	jQuery(document).on('click', 'a[href=\"#google-calendar-settings\"]', function () {
+		fetchGCalHistory();
+	});
+
+	if (window.location.hash === '#google-calendar-settings') {
+		fetchGCalHistory();
+	}
 	</script>
 	";
 	return $gc_settings_configure_js;
@@ -813,10 +975,12 @@ function gc_setting_configure_ajax() {
 		$ct_gc_id = $_POST['ct_gc_id'];
 		$ct_gc_status_configure = $_POST['ct_gc_status_configure'];
 		$ct_gc_status_sync_configure = $_POST['ct_gc_status_sync_configure'];
+		$ct_gc_sync_direction = isset($_POST['ct_gc_sync_direction']) ? $_POST['ct_gc_sync_direction'] : 'two_way';
 		$GC_id_configure = array(
 			'ct_gc_id'=>$ct_gc_id,
 			'ct_gc_status_configure'=>$ct_gc_status_configure,
-			'ct_gc_status_sync_configure'=>$ct_gc_status_sync_configure
+			'ct_gc_status_sync_configure'=>$ct_gc_status_sync_configure,
+			'ct_gc_sync_direction'=>$ct_gc_sync_direction
 		);
 		foreach($GC_id_configure as $option_key=>$option_value){
 			$GC_id=$setting->set_option($option_key,$option_value);
@@ -989,6 +1153,9 @@ function gc_add_booking_ajax() {
 		}	
 	}
 	/* Admin Booking GC */
+	if ($settings->get_option('ct_gc_sync_direction') === 'gcal_to_system') {
+		return;
+	}
 	if(isset($_SESSION['ct_details']['email']) &&  $_SESSION['ct_details']['email']==''){
 		$client_email = $_SESSION['ct_details']['existing_username'];	
 	}else{
@@ -1088,6 +1255,9 @@ function gc_add_staff_booking_ajax() {
 		}	
 	}
 	/* Staff Booking GC */
+	if ($settings->get_option('ct_gc_sync_direction') === 'gcal_to_system') {
+		return;
+	}
 	if(isset($_SESSION['ct_details']['email']) &&  $_SESSION['ct_details']['email']==''){
 		$client_email = $_SESSION['ct_details']['existing_username'];	
 	}else{
@@ -1134,6 +1304,9 @@ function gc_add_staff_booking_ajax() {
 if(!function_exists("gc_reschedule_booking_ajax")){
 function gc_reschedule_booking_ajax() {
 	global $setting,$dates,$timess,$order_duration;
+	if ($setting->get_option('ct_gc_sync_direction') === 'gcal_to_system') {
+		return;
+	}
 	$gcevent_id = $_POST['gc_event_id'];
 	$gc_staff_event_id = $_POST['gc_staff_event_id'];
 	$pid = $_POST['pid'];
@@ -1220,6 +1393,9 @@ function gc_reschedule_booking_ajax() {
 if(!function_exists("gc_reschedule_booking_by_reminder_ajax")){
 function gc_reschedule_booking_by_reminder_ajax() {
 	global $setting,$dates,$timess,$pid,$gcevent_id,$gc_staff_event_id;
+	if ($setting->get_option('ct_gc_sync_direction') === 'gcal_to_system') {
+		return;
+	}
 	if(isset($gcevent_id) && $gcevent_id!='') {
 		$provider_gc_id = $setting->get_option('ct_gc_id');
 		$provider_gc_data = $setting->get_option('ct_gc_token');
@@ -1294,7 +1470,10 @@ function gc_reschedule_booking_by_reminder_ajax() {
 }
 if(!function_exists("gc_cancel_reject_booking_ajax")){
 function gc_cancel_reject_booking_ajax(){
-	global $gc_staff_event_id, $gc_event_id, $pid;
+	global $gc_staff_event_id, $gc_event_id, $pid, $setting;
+	if (isset($setting) && $setting->get_option('ct_gc_sync_direction') === 'gcal_to_system') {
+		return;
+	}
 	if(isset($gc_event_id) && $gc_event_id != ''){
 		$curldeleteevent = curl_init();
 		curl_setopt_array($curldeleteevent, array(

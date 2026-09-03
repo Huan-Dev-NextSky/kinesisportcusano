@@ -16,7 +16,7 @@ $objuserdetails->conn = $conn;
 		 		<?php                         
 		 		/* SET SESSION VALUE HERE IN HARD CODED VALUE OF USERid FROM 1 TO SESSION id */                        
 		 		$objuserdetails->id = $_SESSION['ct_login_user_id'];                       
-		 	    $userinfo = $objuserdetails->readone();                        
+		 	    $userinfo = $objuserdetails->readone_assoc();                        
 		 	    ?>                    
 		 	</div>                    
 		 	<div class="col-lg-8 col-md-8 col-xs-12 np">                        
@@ -25,46 +25,56 @@ $objuserdetails->conn = $conn;
 		 		<div class="form-group col-md-6 col-sm-6 col-xs-12">                            
 		 			<label for="firstname"><?php echo $label_language_values['first_name'];?>
 		 			</label>                            
-		 			<input class="form-control" name="userfirstname" id="userfirstname" value="<?php  echo $userinfo[3];?>" type="text">                        
+		 			<input class="form-control" name="userfirstname" id="userfirstname" value="<?php  echo isset($userinfo['first_name']) ? $userinfo['first_name'] : '';?>" type="text">                        
 		 		</div>                        
 		 		<div class="form-group col-md-6 col-sm-6 col-xs-12">                            
 		 			<label for="lastname"><?php echo $label_language_values['last_name'];?>
 		 			</label>                            
-		 			<input class="form-control" name="userlastname" id="userlastname" value="<?php  echo $userinfo[4];?>" type="text">                        
+		 			<input class="form-control" name="userlastname" id="userlastname" value="<?php  echo isset($userinfo['last_name']) ? $userinfo['last_name'] : '';?>" type="text">                        
 		 		</div>                        
 		 		<div class="form-group col-md-6 col-sm-6 col-xs-12">                            
-		 			<label for="inputEmail"><?php echo $label_language_values['email']." ".$label_language_values['address'];?></label><span class="form-control"><?php  echo $userinfo[1];?></span>
+		 			<label for="inputEmail"><?php echo $label_language_values['email']." ".$label_language_values['address'];?></label><span class="form-control"><?php  echo isset($userinfo['user_email']) ? $userinfo['user_email'] : '';?></span>
 		 		</div>                        
 				<div class="form-group col-md-6 col-sm-6 col-xs-12">                            
 					<label for="admin-phone-number"><?php echo $label_language_values['phone'];?></label>                            
-					<input type="tel" class="form-control phone_number" name="userphone" id="userphone" value="<?php  echo $userinfo[5];?>" onkeyup="if (/\D/g.test(this.value)) this.value  =is.value.replace(/\D/g,'')" />                        
+					<input type="tel" class="form-control phone_number" name="userphone" id="userphone" value="<?php  echo isset($userinfo['phone']) ? $userinfo['phone'] : '';?>" onkeyup="if (/\D/g.test(this.value)) this.value  =is.value.replace(/\D/g,'')" />                        
+				</div>
+				<div class="form-group col-md-6 col-sm-6 col-xs-12">                            
+					<label for="userdob">Date of Birth (YYYY-MM-DD)</label>                            
+					<input type="date" class="form-control" name="userdob" id="userdob" value="<?php  echo isset($userinfo['dob']) ? $userinfo['dob'] : '';?>" />                        
 				</div>
 				<div class="form-group col-md-6 col-sm-6 col-xs-12">                            
 					<label for="admin-address"><?php echo $label_language_values['address'];?></label>             
-					<input class="form-control" id="useraddress" name="useraddress" value="<?php  echo $userinfo[7];?>" />                        
+					<input class="form-control" id="useraddress" name="useraddress" value="<?php  echo isset($userinfo['address']) ? $userinfo['address'] : '';?>" />                        
 				</div>                        
 				<div class="form-group col-md-6 col-sm-6 col-xs-12">                            
 					<label for="city"><?php echo $label_language_values['city'];?></label>       
-					<input class="form-control value_city" id="usercity" name="usercity" placeholder="<?php echo $label_language_values['city'];?>" value="<?php  echo $userinfo[8];?>" type="text">                        
+					<input class="form-control value_city" id="usercity" name="usercity" placeholder="<?php echo $label_language_values['city'];?>" value="<?php  echo isset($userinfo['city']) ? $userinfo['city'] : '';?>" type="text">                        
 				</div>                        
 				<div class="form-group col-md-6 col-sm-6 col-xs-12">                            
 					<label for="state"><?php echo $label_language_values['state'];?></label>     
-					<input class="form-control value_state" id="userstate" name="userstate" placeholder="<?php echo $label_language_values['state'];?>" value="<?php  echo $userinfo[9];?>" type="text">                        
+					<input class="form-control value_state" id="userstate" name="userstate" placeholder="<?php echo $label_language_values['state'];?>" value="<?php  echo isset($userinfo['state']) ? $userinfo['state'] : '';?>" type="text">                        
 				</div>						
 				<?php  if($setting->get_option('ct_user_zip_code') == 'Y')
 				{?>                        
 					<div class="form-group col-md-6 col-sm-6 col-xs-12">                       
 						<label for="zip"><?php echo $label_language_values['zip'];?></label>     
-						<input class="form-control value_zip" id="userzip" name="userzip" placeholder="<?php echo $label_language_values['zip'];?>" value="<?php  echo $userinfo[6];?>" type="text">                        
+						<input class="form-control value_zip" id="userzip" name="userzip" placeholder="<?php echo $label_language_values['zip'];?>" value="<?php  echo isset($userinfo['zip']) ? $userinfo['zip'] : '';?>" type="text">                        
 					</div>						
 				<?php  } ?>                        
+				<div class="form-group col-md-12 col-sm-12 col-xs-12">
+					<label style="font-weight: 500; cursor: pointer;">
+						<input type="checkbox" id="user_sms_opt_in" name="user_sms_opt_in" <?php if (!isset($userinfo['sms_opt_in']) || $userinfo['sms_opt_in'] === 'Y') { echo 'checked'; } ?> />
+						&nbsp; I agree to receive SMS booking notifications and appointment reminders
+					</label>
+				</div>
 				<div class="form-group col-md-12 col-sm-12 col-xs-12  mb-0">            
 					<a href="javascript:void(0)" id="btn-change-pass" class="btn btn-link pl-0"><?php echo $label_language_values['change_password'];?></a>
 				</div>                        
 				<div class="ct-change-password hide-div">                            
 					<div class="form-group col-md-12 col-sm-12 col-xs-12 mb-0">              
 						<label for="useroldpass"><?php echo $label_language_values['old_password'];?></label>                                
-						<input name="userdboldpass" value="<?php echo $userinfo[2];?>" class="form-control" id="userdboldpass" type="hidden">                       
+						<input name="userdboldpass" value="" class="form-control" id="userdboldpass" type="hidden">                       
 						<input name="useroldpass" class="form-control u_op" id="useroldpass" type="password">                  
 						<label id="msg_oldps" class="old_pass_msg"></label>                           
 					</div>                            

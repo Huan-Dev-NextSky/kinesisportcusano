@@ -13,9 +13,13 @@ class cleanto_login_check{
             if($value['role']=="admin"){
                 $_SESSION['ct_adminid'] = $value['id'];
                 $_SESSION['ct_useremail'] = $value['email'];
+                $_SESSION['ct_userrole'] = 'admin';
+                $roleResponse = "yesadmin";
             }else{
                 $_SESSION['ct_staffid'] = $value['id'];
                 $_SESSION['ct_useremail'] = $value['email'];                
+                $_SESSION['ct_userrole'] = $value['role'];
+                $roleResponse = "yesstaff";
             }
             
                 if($this->remember == "true"){
@@ -31,7 +35,7 @@ class cleanto_login_check{
                     setcookie('cleanto_password',null, -1, '/');
                     setcookie('cleanto_remember',null, -1, '/'); */
                 }
-            echo "yesadmin";
+            echo $roleResponse;
         }else{
             $query = "select * from `ct_users` where `user_email` = '".$name."' and `user_pwd` = '".$password."'";
             $result=mysqli_query($this->conn,$query);

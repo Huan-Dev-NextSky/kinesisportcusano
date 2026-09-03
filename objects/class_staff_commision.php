@@ -191,7 +191,7 @@ class cleanto_staff_commision{
 	}
 	/* GET APPOINTMENTS ASSIGNED STAFF*/
 	public function get_staff_details_api() {
-		$query = "select DISTINCT `p`.`order_id`, `b`.`booking_date_time`, `b`.`booking_status`, `b`.`reject_reason`,`s`.`title`,`p`.`net_amount` as `total_payment`,`b`.`gc_event_id`,`b`.`gc_staff_event_id`,`b`.`staff_ids` from `ct_bookings` as `b`,`ct_payments` as `p`,`ct_services` as `s`,`ct_admin_info` as `u` where `b`.`staff_ids` = $this->id and `b`.`service_id` = `s`.`id` and `b`.`order_id` = `p`.`order_id` and `u`.`role`= 'staff'  order by `b`.`booking_date_time` desc";
+		$query = "select DISTINCT `p`.`order_id`, `b`.`booking_date_time`, `b`.`booking_status`, `b`.`reject_reason`,`s`.`title`,`p`.`net_amount` as `total_payment`,`b`.`gc_event_id`,`b`.`gc_staff_event_id`,`b`.`staff_ids` from `ct_bookings` as `b`,`ct_payments` as `p`,`ct_services` as `s`,`ct_admin_info` as `u` where `b`.`staff_ids` = $this->id and `b`.`service_id` = `s`.`id` and `b`.`order_id` = `p`.`order_id` and `u`.`role`= 'doctor'  order by `b`.`booking_date_time` desc";
 		$result = mysqli_query($this->conn, $query);
 		return $result;
 	}

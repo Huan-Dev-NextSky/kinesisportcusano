@@ -24,6 +24,9 @@ ob_start();
 session_start();
 include(dirname(dirname(__FILE__)) . '/header.php');
 
+/* Enforce customer/doctor route guards on every page that uses admin/header.php */
+include(dirname(__FILE__) . '/user_session_check.php');
+
 if (!isset($_SESSION['ct_adminid']) && !isset($_SESSION['ct_login_user_id'])) {    ?>
    <script>
       var loginObj = {
@@ -489,6 +492,15 @@ if ($language_label_arr[1] != "" || $language_label_arr[3] != "" || $language_la
    
          #cta #cta-main-navigation .navbar-inverse{      
             background:" . $setting->get_option('ct_primary_color_admin') . " !important;  }  
+         #cta .ct-segment-tabs > li > a:hover {
+            color: " . $setting->get_option('ct_primary_color_admin') . " !important;
+         }
+         #cta .ct-segment-tabs > li.active > a,
+         #cta .ct-segment-tabs > li.active > a:hover,
+         #cta .ct-segment-tabs > li.active > a:focus {
+            background: " . $setting->get_option('ct_primary_color_admin') . " !important;
+            color: #fff !important;
+         }
          #cta #cta-main-navigation .navbar .nav.cta-nav-tab > .active > a, #cta #cta-main-navigation .navbar .nav.user-nav-bar > .active > a,   #cta #cta-top-nav .navbar .nav > .active > a:focus{      
             background-color: " . $setting->get_option('ct_secondary_color_admin') . " ;      
             color: " . $setting->get_option('ct_text_color_admin') . "  ;   }    
@@ -765,7 +777,7 @@ if ($language_label_arr[1] != "" || $language_label_arr[3] != "" || $language_la
                            </li>
                            <li class="<?php if (strpos($_SERVER['SCRIPT_NAME'], 'staff.php') != false) {
                                           echo 'active';
-                                       } ?>"><a class="staff_link_clicked" href="<?php echo BASE_URL; ?>/admin/staff.php"><i class="fa fa-user-circle-o"></i><span> <?php echo $label_language_values['staff']; ?></span></a>
+                                       } ?>"><a class="staff_link_clicked" href="<?php echo BASE_URL; ?>/admin/staff.php"><i class="fa fa-user-md"></i><span> Doctors</span></a>
                            </li>
                            <!--li class="<?php if (strpos($_SERVER['SCRIPT_NAME'], 'customers.php') != false) {
                                              echo 'active';
@@ -781,6 +793,10 @@ if ($language_label_arr[1] != "" || $language_label_arr[3] != "" || $language_la
                                           echo 'active';
                                        } ?>"><a href="<?php echo BASE_URL; ?>/admin/payments.php"><i class="fa fa-money"></i> <span><?php echo $label_language_values['payments']; ?>
                                  </span></a>
+                           </li>
+                           <li class="<?php if (strpos($_SERVER['SCRIPT_NAME'], 'kinesis-sync.php') != false) {
+                                          echo 'active';
+                                       } ?>"><a href="<?php echo BASE_URL; ?>/admin/kinesis-sync.php"><i class="fa fa-history"></i><span>Sync History</span></a>
                            </li>
                            <li class="<?php if (strpos($_SERVER['SCRIPT_NAME'], 'settings.php') != false) {
                                           echo 'active';
@@ -1028,6 +1044,7 @@ if ($language_label_arr[1] != "" || $language_label_arr[3] != "" || $language_la
   ?>
   var current_date = '<?php  echo $current_date; ?>';
   var advance_date = '<?php  echo $advance_date; ?>';
+  var ct_allow_manual_booking = '<?php echo ($setting->get_option("ct_allow_manual_booking") === "N") ? "N" : "Y"; ?>';
 </script>				 
       <!-- all alerts, success messages -->
       <div class="ct-alert-msg-show-main mainheader_message">

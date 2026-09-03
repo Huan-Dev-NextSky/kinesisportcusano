@@ -1905,6 +1905,145 @@ td.fc-widget-content hr.fc-divider.fc-widget-header {
 	text-transform: uppercase;
 }
 
+/* Shared segmented tabs (Doctor dashboard, Schedule, Staff details, Admin/User panels, etc.) */
+#cta .ct-segment-tabs {
+	display: -webkit-box;
+	display: -ms-flexbox;
+	display: flex;
+	-ms-flex-wrap: wrap;
+	flex-wrap: wrap;
+	gap: 8px;
+	border: 0 !important;
+	margin: 0 0 18px;
+	padding: 6px;
+	background: #f3f6f8;
+	border-radius: 10px;
+}
+#cta .panel > .ct-segment-tabs,
+#cta .panel-heading + .ct-segment-tabs {
+	margin: 12px 15px 18px;
+}
+#cta .ct-segment-tabs > li {
+	float: none !important;
+	-webkit-box-flex: 1;
+	-ms-flex: 1 1 auto;
+	flex: 1 1 auto;
+	min-width: 120px;
+	margin: 0 !important;
+}
+#cta .ct-segment-tabs > li > a {
+	margin: 0 !important;
+	padding: 12px 10px !important;
+	border: 0 !important;
+	border-radius: 8px !important;
+	text-align: center;
+	color: #5f6b73 !important;
+	font-weight: 600;
+	font-size: 13px;
+	letter-spacing: 0.2px;
+	background: transparent !important;
+	text-transform: none;
+	transition: all 0.2s ease;
+	white-space: nowrap;
+}
+#cta .ct-segment-tabs > li > a i.fa {
+	display: inline-block;
+	margin-right: 10px;
+	opacity: 0.85;
+}
+#cta .ct-segment-tabs > li > a:hover {
+	background: #ffffff !important;
+	color: #1a7a8c !important;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+#cta .ct-segment-tabs > li.active > a,
+#cta .ct-segment-tabs > li.active > a:hover,
+#cta .ct-segment-tabs > li.active > a:focus {
+	background: #1a7a8c !important;
+	color: #fff !important;
+	box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+@media (max-width: 767px) {
+	#cta .ct-segment-tabs {
+		-webkit-box-orient: vertical;
+		-webkit-box-direction: normal;
+		-ms-flex-direction: column;
+		flex-direction: column;
+	}
+	#cta .ct-segment-tabs > li {
+		min-width: 0;
+	}
+}
+
+/* User portal light polish */
+#cta #cta-user-appointments,
+#cta #cta-user-profile,
+#cta #cta-client-profile,
+#cta #cta-profile {
+	background: #fff;
+	border-radius: 10px;
+	box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+	padding: 12px 8px 24px;
+	margin-top: 12px;
+	border: 1px solid #e8eef1;
+}
+#cta #cta-user-appointments .header4,
+#cta #cta-user-profile .header4,
+#cta #cta-client-profile h1.panel-title,
+#cta #cta-user-appointments h4.header4,
+#cta #cta-profile .header4 {
+	font-size: 20px;
+	font-weight: 600;
+	color: #2c3a42;
+	margin: 10px 15px 18px;
+	padding-bottom: 12px;
+	border-bottom: 1px solid #e8eef1;
+}
+#cta #cta-user-profile .form-control,
+#cta #cta-user-appointments .form-control {
+	border-radius: 6px;
+	border-color: #d5dee3;
+	box-shadow: none;
+	height: 38px;
+}
+#cta #cta-user-profile .form-control:focus,
+#cta #cta-user-appointments .form-control:focus {
+	border-color: #1a7a8c;
+	box-shadow: 0 0 0 2px rgba(26,122,140,0.12);
+}
+#cta #cta-user-profile label,
+#cta #cta-user-appointments label {
+	font-weight: 500;
+	color: #4a5560;
+	font-size: 13px;
+}
+#cta #cta-user-appointments .table,
+#cta #cta-user-profile .table {
+	border-radius: 8px;
+	overflow: hidden;
+	border-color: #e8eef1;
+}
+#cta #cta-user-appointments .table > thead > tr > th {
+	background: #f3f6f8;
+	border-bottom: 1px solid #e0e7eb;
+	color: #2c3a42;
+	font-weight: 600;
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+}
+#cta #cta-user-appointments .btn-info.myappointment_popup,
+#cta #cta-user-appointments .ct-my-booking-user {
+	border-radius: 6px;
+	font-weight: 500;
+}
+#cta #cta-user-appointments .header4 .btn-success,
+#cta #cta-user-profile .mybtnuserprofile_save {
+	border-radius: 6px;
+	font-weight: 600;
+	padding: 8px 18px;
+}
+
 #cta #cta-staff-panel .ct-staff-right-details table {
 	float: left;
 	width: 100%;

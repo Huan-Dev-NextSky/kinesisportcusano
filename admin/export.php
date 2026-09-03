@@ -36,10 +36,10 @@ div.dt-buttons {
 			<h1 class="panel-title"><?php echo $label_language_values['export_your_details'];?></h1>
 		</div>
 		<div class="panel-body">
-			<ul class="nav nav-tabs">
-				<li class="active"><a data-toggle="tab" href="#booking-info-export"><?php echo $label_language_values['booking_information'];?></a></li>
-				<li><a data-toggle="tab" href="#staff-info-export"><?php echo $label_language_values['customer_information'];?></a></li>
-				<li><a data-toggle="tab" href="#services-info-export"><?php echo $label_language_values['services_information'];?></a></li>
+			<ul class="nav nav-tabs ct-segment-tabs">
+				<li class="active"><a data-toggle="tab" href="#booking-info-export"><i class="fa fa-calendar"></i><?php echo $label_language_values['booking_information'];?></a></li>
+				<li><a data-toggle="tab" href="#staff-info-export"><i class="fa fa-users"></i><?php echo $label_language_values['customer_information'];?></a></li>
+				<li><a data-toggle="tab" href="#services-info-export"><i class="fa fa-tasks"></i><?php echo $label_language_values['services_information'];?></a></li>
 				
 			</ul>
 			

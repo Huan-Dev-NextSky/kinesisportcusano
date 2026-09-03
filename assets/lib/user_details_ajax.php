@@ -61,6 +61,27 @@ $date_format=$setting->get_option('ct_date_picker_date_format');
 $time_format = $setting->get_option('ct_time_format');
 $getmaximumbooking = $setting->get_option('ct_max_advance_booking_time');
 
+/** Minutes until booking start in configured timezone */
+function ct_minutes_until_booking($setting, $first_step, $booking_date_time) {
+	$t_zone_value = $setting->get_option('ct_timezone');
+	$server_timezone = date_default_timezone_get();
+	if (isset($t_zone_value) && $t_zone_value != '') {
+		$offset = $first_step->get_timezone_offset($server_timezone, $t_zone_value);
+		$timezonediff = $offset / 3600;
+	} else {
+		$timezonediff = 0;
+	}
+	if (is_numeric(strpos((string)$timezonediff, '-'))) {
+		$timediffmis = str_replace('-', '', $timezonediff) * 60;
+		$currDateTime_withTZ = strtotime("-" . $timediffmis . " minutes", strtotime(date('Y-m-d H:i:s')));
+	} else {
+		$timediffmis = str_replace('+', '', $timezonediff) * 60;
+		$currDateTime_withTZ = strtotime("+" . $timediffmis . " minutes", strtotime(date('Y-m-d H:i:s')));
+	}
+	$remain = strtotime($booking_date_time) - $currDateTime_withTZ;
+	return (int)round($remain / 60);
+}
+
 $symbol_position=$setting->get_option('ct_currency_symbol_position');
 $decimal=$setting->get_option('ct_price_format_decimal_places');
 
@@ -209,40 +230,83 @@ if(isset($_POST['updatepass'])){
     $objuserdetails->lastname = $_POST['lastname'];
     $objuserdetails->address = $_POST['address'];
     $objuserdetails->city = $_POST['city'];
-    $objuserdetails->zip = $_POST['zip'];
+    $objuserdetails->zip = isset($_POST['zip']) ? $_POST['zip'] : '';
     $objuserdetails->state = $_POST['state'];
     $objuserdetails->phone = $_POST['phone'];
-    $objuserdetails->id = $_POST['id'];
-
-    $op=md5($_POST['oldpassword']);
-    $dp=$_POST['dboldpassword'];
-    $np=$_POST['newpassword'];
-    $rp=$_POST['retypepassword'];
-
-    $operation = 1;
-    if ($_POST['oldpassword'] != "") {
-        if ($op != $dp) {
-            $operation = 2;
-            echo "Your Old Password Incorrect...";
-        }
-        else {
-            $operation = 3;
-            if ($np == $rp) {
-                $objuserdetails->password=md5($rp);
-                $update=$objuserdetails->update_profile();
-                if($update){
-                }
-
-            }
-            else{
-                echo "Please Retype Correct Password...";
-            }
-        }
+    $objuserdetails->dob = isset($_POST['dob']) ? $_POST['dob'] : '';
+    $objuserdetails->sms_opt_in = isset($_POST['sms_opt_in']) ? $_POST['sms_opt_in'] : 'Y';
+    $objuserdetails->id = isset($_SESSION['ct_login_user_id']) ? (int)$_SESSION['ct_login_user_id'] : (int)$_POST['id'];
+    if (!isset($_SESSION['ct_login_user_id']) || (int)$_SESSION['ct_login_user_id'] !== (int)$objuserdetails->id) {
+        echo "Unauthorized";
+        exit;
     }
-    if ($operation == 1) {
+
+    $op=md5(isset($_POST['oldpassword']) ? $_POST['oldpassword'] : '');
+    /* Never trust client-supplied password hash — load from DB */
+    $currentUser = $objuserdetails->readone_assoc();
+    $dp = ($currentUser && isset($currentUser['user_pwd'])) ? $currentUser['user_pwd'] : '';
+    $np=isset($_POST['newpassword']) ? $_POST['newpassword'] : '';
+    $rp=isset($_POST['retypepassword']) ? $_POST['retypepassword'] : '';
+
+    $profileUpdated = false;
+    if (isset($_POST['oldpassword']) && $_POST['oldpassword'] != "") {
+        if ($op != $dp) {
+            echo "Your Old Password Incorrect...";
+            exit;
+        }
+        if ($np != $rp) {
+            echo "Please Retype Correct Password...";
+            exit;
+        }
+        $objuserdetails->password=md5($rp);
+        $update=$objuserdetails->update_profile();
+        $profileUpdated = true;
+    } else {
         $objuserdetails->password=$dp;
         $update=$objuserdetails->update_profile();
-        if($update){
+        $profileUpdated = true;
+    }
+
+    // Sync Customer profile to Kinesis only after successful local save
+    if ($profileUpdated && $setting->get_option('kinesis_api_status') === 'Y') {
+        require_once dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwApiClient.php';
+        $apiClient = new AwwApiClient($conn);
+        $userRow = $objuserdetails->readone_assoc();
+        if ($userRow) {
+            $extCustId = !empty($userRow['external_customer_id']) ? (int)$userRow['external_customer_id'] : null;
+            if (!$extCustId && !empty($userRow['user_email'])) {
+                $searchRes = $apiClient->searchCustomerByEmail($userRow['user_email']);
+                if ($searchRes['success'] && !empty($searchRes['data'])) {
+                    $extCustId = isset($searchRes['data']['id']) ? (int)$searchRes['data']['id'] : (isset($searchRes['data']['Id']) ? (int)$searchRes['data']['Id'] : null);
+                    if ($extCustId) {
+                        @mysqli_query($conn, "UPDATE `ct_users` SET `external_customer_id` = {$extCustId} WHERE `id` = " . (int)$userRow['id']);
+                    }
+                }
+            }
+
+            if ($extCustId) {
+                $apiClient->updateCustomer($extCustId, array(
+                    'firstName' => $objuserdetails->firstname,
+                    'lastName' => $objuserdetails->lastname,
+                    'dateOfBirth' => !empty($objuserdetails->dob) ? $objuserdetails->dob : '1990-01-01',
+                    'email' => $userRow['user_email'],
+                    'phoneNumber' => $objuserdetails->phone
+                ));
+            } elseif (!empty($userRow['user_email'])) {
+                $createRes = $apiClient->createCustomer(array(
+                    'firstName' => $objuserdetails->firstname,
+                    'lastName' => $objuserdetails->lastname,
+                    'dateOfBirth' => !empty($objuserdetails->dob) ? $objuserdetails->dob : '1990-01-01',
+                    'email' => $userRow['user_email'],
+                    'phoneNumber' => $objuserdetails->phone
+                ));
+                if (!empty($createRes['success']) && !empty($createRes['data'])) {
+                    $newId = isset($createRes['data']['id']) ? (int)$createRes['data']['id'] : (isset($createRes['data']['Id']) ? (int)$createRes['data']['Id'] : 0);
+                    if ($newId > 0) {
+                        @mysqli_query($conn, "UPDATE `ct_users` SET `external_customer_id` = {$newId} WHERE `id` = " . (int)$userRow['id']);
+                    }
+                }
+            }
         }
     }
 }
@@ -252,6 +316,7 @@ if(isset($_POST['getmytimeslots'])){
 			$staff_id_array = explode(",",$_POST['staff_id']);
 			$staff_id = $staff_id_array[0];
 		}
+		$slot_order_id = isset($_POST['order_id']) ? (int)$_POST['order_id'] : 0;
     $t_zone_value = $setting->get_option('ct_timezone');
     $server_timezone = date_default_timezone_get();
     if(isset($t_zone_value) && $t_zone_value!=''){
@@ -299,7 +364,7 @@ if(isset($_POST['getmytimeslots'])){
 			jQuery('.selectpicker').selectpicker();
 		});
     </script>
-    <select class="selectpicker mydatepicker_appointment form-control" id="myuser_reschedule_time" data-size="10" style="">
+    <select class="selectpicker mydatepicker_appointment form-control myuser_reschedule_time" id="myuser_reschedule_time<?php echo $slot_order_id > 0 ? $slot_order_id : ''; ?>" data-order="<?php echo $slot_order_id; ?>" data-size="10" style="">
         <?php  
         if($time_schedule['off_day']!=true && isset($time_schedule['slots']) && sizeof((array)$time_schedule['slots'])>0 && $allbreak_counter != sizeof((array)$time_schedule['slots']) && $allofftime_counter != sizeof((array)$time_schedule['slots'])){
             foreach($time_schedule['slots']  as $slot) {
@@ -407,24 +472,71 @@ if(isset($_POST['reschedulebooking'])){
     $booking_status = "RS";
     $read_status = "U";
     $lastmodify = date('Y-m-d H:i:s');
+    $is_customer_request = (isset($_POST['user']) && $_POST['user'] === 'customer');
+    if ($is_customer_request && $setting->get_option('ct_allow_customer_reschedule') === 'N') {
+      echo "0";
+      exit;
+    }
+    if (!$is_customer_request && !isset($_SESSION['ct_adminid']) && !isset($_SESSION['ct_staffid'])) {
+      echo "0";
+      exit;
+    }
+    $orderdetail_pre = $objdashboard->getclientorder($id);
+    if (!$orderdetail_pre) {
+      echo "0";
+      exit;
+    }
+    if ($is_customer_request) {
+      if (!isset($_SESSION['ct_login_user_id']) || (int)$orderdetail_pre[3] !== (int)$_SESSION['ct_login_user_id']) {
+        echo "0";
+        exit;
+      }
+      $reschedule_buffer = (int)$setting->get_option('ct_reshedule_buffer_time');
+      if ($reschedule_buffer < 0) { $reschedule_buffer = 0; }
+      $mins_left = ct_minutes_until_booking($setting, $first_step, $orderdetail_pre[0]);
+      if ($mins_left <= $reschedule_buffer) {
+        echo "0";
+        exit;
+      }
+      $pendingChk = @mysqli_query($conn, "SELECT `change_request_status` FROM `ct_bookings` WHERE `order_id` = " . (int)$order . " LIMIT 1");
+      $pendingRow = ($pendingChk && ($pr = mysqli_fetch_assoc($pendingChk))) ? $pr['change_request_status'] : 'NONE';
+      if ($pendingRow === 'CANCEL_REQUESTED' || $pendingRow === 'RESCHEDULE_REQUESTED') {
+        echo "0";
+        exit;
+      }
+    }
     $datetime_withmaxtime = "";
     if($getmaximumbooking != ""){
       $datetime_withmaxtime = strtotime('+'.$getmaximumbooking.' month',strtotime(date('Y-m-d')));
     }
     if(strtotime($dates) <= $datetime_withmaxtime || $datetime_withmaxtime == ""){
-			$dat = $dates."".$timess;
+			$dat = trim($dates) . " " . trim($timess);
 			$finaldate = date("Y-m-d H:i:s", strtotime($dat));
-			$objuserdetails->reschedule_booking($finaldate,$order,$booking_status,$read_status,$lastmodify);
-			$serializedData = $objuserdetails->get_user_notes($order);
-			$data   = unserialize(base64_decode($serializedData[0]));
-			if(array_key_exists('notes', $data)) {
-					$data['notes'] = $notes;
+			if (!$finaldate || $finaldate === '1970-01-01 00:00:00' || strtotime($dat) === false) {
+				echo "0";
+				exit;
 			}
-			$serializedData = base64_encode(serialize($data));
-			$objuserdetails->update_notes($order,$serializedData);
+
+			/* Customer: request only — wait for Root Admin approval before changing date / GCal / Kinesis */
+			if ($is_customer_request) {
+				$objuserdetails->request_reschedule_booking($order, $finaldate, $notes, $lastmodify);
+			} else {
+				$objuserdetails->reschedule_booking($finaldate,$order,$booking_status,$read_status,$lastmodify);
+				@mysqli_query($conn, "UPDATE `ct_bookings` SET `change_request_status` = 'NONE', `kinesis_sync_status` = 'UPDATE_PENDING' WHERE `order_id` = " . (int)$order);
+				@mysqli_query($conn, "UPDATE `ct_gcal_kinesis_sync` SET `event_start` = '{$finaldate}', `sync_status` = 'PENDING', `sync_action` = 'UPDATE', `last_sync_message` = 'Rescheduled by admin to {$finaldate}' WHERE `local_order_id` = " . (int)$order);
+
+				$serializedData = $objuserdetails->get_user_notes($order);
+				$data   = unserialize(base64_decode($serializedData[0]));
+				if(is_array($data) && array_key_exists('notes', $data)) {
+						$data['notes'] = $notes;
+				}
+				$serializedData = base64_encode(serialize($data));
+				$objuserdetails->update_notes($order,$serializedData);
+			}
 			$orderdetail = $objdashboard->getclientorder($id);
 			$order_duration = $orderdetail[8];
-			if($gc_hook->gc_purchase_status() == 'exist'){
+			/* Apply GCal only when admin/staff reschedules immediately */
+			if(!$is_customer_request && $gc_hook->gc_purchase_status() == 'exist'){
 				if($setting->get_option('ct_gc_status_configure') == 'Y' && $setting->get_option('ct_gc_status') == 'Y') {
 					echo $gc_hook->gc_reschedule_booking_ajax_hook();
 				}
@@ -634,9 +746,18 @@ if(isset($_POST['reschedulebooking'])){
 		}else{
 			$payment_status = ucwords($payment_status);
 		}
+
+		$sms_client_id = isset($_SESSION['ct_login_user_id']) ? (int)$_SESSION['ct_login_user_id'] : 0;
+		$client_sms_allowed = $objuserdetails->is_sms_opted_in($sms_client_id);
+		$request_note = '';
+		if ($is_customer_request) {
+			$request_note = "Reschedule REQUEST pending admin approval. Proposed: {$finaldate}. Reason: {$notes}";
+			$client_notes = $request_note;
+		}
+
         $searcharray = array('{{service_name}}','{{booking_date}}','{{business_logo}}','{{business_logo_alt}}','{{client_name}}','{{methodname}}','{{units}}','{{addons}}','{{client_email}}','{{phone}}','{{payment_method}}','{{vaccum_cleaner_status}}','{{parking_status}}','{{notes}}','{{contact_status}}','{{address}}','{{price}}','{{admin_name}}','{{firstname}}','{{lastname}}','{{app_remain_time}}','{{reject_status}}','{{company_name}}','{{booking_time}}','{{client_city}}','{{client_state}}','{{client_zip}}','{{company_city}}','{{company_state}}','{{company_zip}}','{{company_country}}','{{company_phone}}','{{company_email}}','{{company_address}}','{{admin_name}}');
 
-        $replacearray = array($service_name, $booking_date , $business_logo, $business_logo_alt, $client_name,$methodname, $units, $addons,$client_email, $client_phone, $payment_status, $final_vc_status, $final_p_status, $client_notes, $client_status,$client_address,$price,$get_admin_name,$firstname,$lastname,'','',$admin_company_name,$booking_time,$client_city,$client_state,$client_zip,$company_city,$company_state,$company_zip,$company_country,$company_phone,$company_email,$company_address,$get_admin_name);
+        $replacearray = array($service_name, $booking_date , $business_logo, $business_logo_alt, $client_name,$methodname, $units, $addons,$client_email, $client_phone, $payment_status, $final_vc_status, $final_p_status, $client_notes, $client_status,$client_address,$price,$get_admin_name,$firstname,$lastname,'',$request_note,$admin_company_name,$booking_time,$client_city,$client_state,$client_zip,$company_city,$company_state,$company_zip,$company_country,$company_phone,$company_email,$company_address,$get_admin_name);
 		
         /* Client Email Template */
         $emailtemplate->email_subject="Appointment Rescheduled by you";
@@ -649,7 +770,9 @@ if(isset($_POST['reschedulebooking'])){
         }
         $subject = "";
         if($_POST['user'] == "customer"){
-            $subject = $label_language_values[strtolower(str_replace(" ","_",$clientemailtemplate[1]))];
+            $subject = $is_customer_request
+				? ("Reschedule request received (pending approval) - Order #".$order)
+				: $label_language_values[strtolower(str_replace(" ","_",$clientemailtemplate[1]))];
         }else{
             $subject = $label_language_values['appointment_rescheduled_by_service_provider'];
         }
@@ -657,6 +780,9 @@ if(isset($_POST['reschedulebooking'])){
         if($setting->get_option('ct_client_email_notification_status') == 'Y' && $clientemailtemplate[4]=='E' ){
 
             $client_email_body = str_replace($searcharray,$replacearray,$clienttemplate);
+            if ($is_customer_request) {
+                $client_email_body = '<p><strong>This is a RESCHEDULE REQUEST pending Root Admin approval. Your appointment date/time has NOT been changed yet.</strong></p>' . $client_email_body;
+            }
 
             if($setting->get_option('ct_smtp_hostname') != '' && $setting->get_option('ct_email_sender_name') != '' && $setting->get_option('ct_email_sender_address') != '' && $setting->get_option('ct_smtp_username') != '' && $setting->get_option('ct_smtp_password') != '' && $setting->get_option('ct_smtp_port') != ''){
                 $mail->IsSMTP();
@@ -681,7 +807,7 @@ if(isset($_POST['reschedulebooking'])){
 
 				$headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
 
-				mail($get_staff_email, $subject, $client_email_body, $headers);
+				mail($client_email, $subject, $client_email_body, $headers);
 
 			}
         }
@@ -698,13 +824,18 @@ if(isset($_POST['reschedulebooking'])){
         }
         $adminsubject = "";
         if($_POST['user'] == "customer"){
-            $adminsubject = $label_language_values[strtolower(str_replace(" ","_",$adminemailtemplate[1]))];
+            $adminsubject = $is_customer_request
+				? ("Reschedule REQUEST pending approval - Order #".$order)
+				: $label_language_values[strtolower(str_replace(" ","_",$adminemailtemplate[1]))];
         }else{
             $adminsubject = $label_language_values['appointment_rescheduled_by_you'];
         }
 
         if($setting->get_option('ct_admin_email_notification_status')=='Y' && $adminemailtemplate[4]=='E'){
             $admin_email_body = str_replace($searcharray,$replacearray,$admintemplate);
+            if ($is_customer_request) {
+                $admin_email_body = '<p><strong>Customer RESCHEDULE REQUEST pending your approval. Appointment date/time has NOT been changed yet.</strong></p>' . $admin_email_body;
+            }
 
             if($setting->get_option('ct_smtp_hostname') != '' && $setting->get_option('ct_email_sender_name') != '' && $setting->get_option('ct_email_sender_address') != '' && $setting->get_option('ct_smtp_username') != '' && $setting->get_option('ct_smtp_password') != '' && $setting->get_option('ct_smtp_port') != ''){
                 $mail_a->IsSMTP();
@@ -729,15 +860,16 @@ if(isset($_POST['reschedulebooking'])){
 
 				$headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
 
-				mail($get_staff_email, $subject, $admin_email_body, $headers);
+				mail($admin_email, $subject, $admin_email_body, $headers);
 
 			}
         }
-        /*SMS SENDING CODE*/
+        /*SMS SENDING CODE — skip for customer pending request (emails already sent with pending subjects)*/
+        if (!$is_customer_request) {
         /*GET APPROVED SMS TEMPLATE*/
 		/* MESSAGEBIRD CODE */
 		if($setting->get_option("ct_sms_messagebird_status") == "Y"){
-			if ($setting->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
+			if ($client_sms_allowed && $setting->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
 				$template = $objdashboard->gettemplate_sms("RS",'C');
 				$phone = $client_phone;
 				if ($template[4] == "E"){
@@ -796,7 +928,7 @@ if(isset($_POST['reschedulebooking'])){
 		/* TEXTLOCAL CODE */
 		if($setting->get_option('ct_sms_textlocal_status') == "Y")
 		{
-			if($setting->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
+			if($client_sms_allowed && $setting->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
 				$template = $objdashboard->gettemplate_sms("RS",'C');
 				$phone = $client_phone;				
 				if($template[4] == "E") {
@@ -839,7 +971,7 @@ if(isset($_POST['reschedulebooking'])){
     }
         /*PLIVO CODE*/
         if($setting->get_option('ct_sms_plivo_status')=="Y"){
-            if($setting->get_option('ct_sms_plivo_send_sms_to_client_status') == "Y"){
+            if($client_sms_allowed && $setting->get_option('ct_sms_plivo_send_sms_to_client_status') == "Y"){
                 $auth_id = $setting->get_option('ct_sms_plivo_account_SID');
 				$auth_token = $setting->get_option('ct_sms_plivo_auth_token');
 				$p_client = new Plivo\RestAPI($auth_id, $auth_token, '', '');
@@ -892,7 +1024,7 @@ if(isset($_POST['reschedulebooking'])){
             }
         }
         if($setting->get_option('ct_sms_twilio_status') == "Y"){
-            if($setting->get_option('ct_sms_twilio_send_sms_to_client_status') == "Y"){
+            if($client_sms_allowed && $setting->get_option('ct_sms_twilio_send_sms_to_client_status') == "Y"){
 				$AccountSid = $setting->get_option('ct_sms_twilio_account_SID');
 				$AuthToken =  $setting->get_option('ct_sms_twilio_auth_token'); 
 				$twilliosms_client = new Services_Twilio($AccountSid, $AuthToken);
@@ -938,7 +1070,7 @@ if(isset($_POST['reschedulebooking'])){
             }
         }
 		if($setting->get_option('ct_nexmo_status') == "Y"){
-			if($setting->get_option('ct_sms_nexmo_send_sms_to_client_status') == "Y"){
+			if($client_sms_allowed && $setting->get_option('ct_sms_nexmo_send_sms_to_client_status') == "Y"){
 				$template = $objdashboard->gettemplate_sms("RS",'C');
 				$phone = $client_phone;				
 				if($template[4] == "E") {
@@ -1033,7 +1165,7 @@ if(isset($_POST['reschedulebooking'])){
 
 				$headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
 
-				mail($get_staff_email, $subject, $client_email_body, $headers);
+				mail($client_email, $subject, $client_email_body, $headers);
 
 			}
 				}
@@ -1178,6 +1310,7 @@ if(isset($_POST['reschedulebooking'])){
 			}
 		}
     /*SMS SENDING CODE END*/
+        }
 
     }
     else{
@@ -1192,16 +1325,39 @@ if(isset($_POST['update_booking_users'])){
 	$lastmodify = date('Y-m-d H:i:s');
     $cancel_reson_book = $_POST['cancel_reson_book'];
 
-    $objuserdetails->update_booking_of_user($order,$cancel_reson_book,$lastmodify);
+	if ($setting->get_option('ct_allow_customer_cancel') === 'N') {
+		echo "0";
+		exit;
+	}
+	if (!isset($_SESSION['ct_login_user_id'])) {
+		echo "0";
+		exit;
+	}
+	$orderdetail_pre = $objdashboard->getclientorder($id);
+	if (!$orderdetail_pre || (int)$orderdetail_pre[3] !== (int)$_SESSION['ct_login_user_id']) {
+		echo "0";
+		exit;
+	}
+	$cancel_buffer = (int)$setting->get_option('ct_cancellation_buffer_time');
+	if ($cancel_buffer < 0) { $cancel_buffer = 0; }
+	$mins_left = ct_minutes_until_booking($setting, $first_step, $orderdetail_pre[0]);
+	if ($mins_left <= $cancel_buffer) {
+		echo "0";
+		exit;
+	}
+	$pendingChk = @mysqli_query($conn, "SELECT `change_request_status` FROM `ct_bookings` WHERE `order_id` = " . (int)$order . " LIMIT 1");
+	$pendingRow = ($pendingChk && ($pr = mysqli_fetch_assoc($pendingChk))) ? $pr['change_request_status'] : 'NONE';
+	if ($pendingRow === 'CANCEL_REQUESTED' || $pendingRow === 'RESCHEDULE_REQUESTED') {
+		echo "0";
+		exit;
+	}
+
+	/* Customer cancel = request only; Root Admin must approve before local/GCal/Kinesis cancel */
+	$objuserdetails->request_cancel_booking($order, $cancel_reson_book, $lastmodify);
+	@mysqli_query($conn, "UPDATE `ct_gcal_kinesis_sync` SET `last_sync_message` = 'Cancellation requested by client (pending admin): " . mysqli_real_escape_string($conn, $cancel_reson_book) . "' WHERE `local_order_id` = " . (int)$order);
 
     $orderdetail = $objdashboard->getclientorder($id);
     $clientdetail = $objdashboard->clientemailsender($id);
-	
-	/* Delete in Google Calendar Start */
-	if($gc_hook->gc_purchase_status() == 'exist'){
-		echo $gc_hook->gc_cancel_reject_booking_hook();
-	}
-	/* Delete in Google Calendar End */
 	
     /*$booking_date = date("Y-m-d H:i", strtotime($clientdetail['booking_date_time']));*/
 	
@@ -1407,9 +1563,16 @@ if(isset($_POST['update_booking_users'])){
 	}else{
 		$payment_status = ucwords($payment_status);
 	}
+
+	/* Pending-approval cancel request: enrich templates + respect SMS opt-in */
+	$request_note = "Cancellation REQUEST pending admin approval. Reason: " . $cancel_reson_book;
+	$client_notes = $request_note . (isset($client_notes) && $client_notes !== '' && $client_notes !== 'N/A' ? " | " . $client_notes : '');
+	$sms_client_id = isset($_SESSION['ct_login_user_id']) ? (int)$_SESSION['ct_login_user_id'] : 0;
+	$client_sms_allowed = $objuserdetails->is_sms_opted_in($sms_client_id);
+
     $searcharray = array('{{service_name}}','{{booking_date}}','{{business_logo}}','{{business_logo_alt}}','{{client_name}}','{{methodname}}','{{units}}','{{addons}}','{{client_email}}','{{phone}}','{{payment_method}}','{{vaccum_cleaner_status}}','{{parking_status}}','{{notes}}','{{contact_status}}','{{address}}','{{price}}','{{admin_name}}','{{firstname}}','{{lastname}}','{{app_remain_time}}','{{reject_status}}','{{company_name}}','{{booking_time}}','{{client_city}}','{{client_state}}','{{client_zip}}','{{company_city}}','{{company_state}}','{{company_zip}}','{{company_country}}','{{company_phone}}','{{company_email}}','{{company_address}}','{{admin_name}}');
 
-    $replacearray = array($service_name, $booking_date , $business_logo, $business_logo_alt, $client_name,$methodname, $units, $addons,$client_email, $client_phone, $payment_status, $final_vc_status, $final_p_status, $client_notes, $client_status,$client_address,$price,$get_admin_name,$firstname,$lastname,'','',$admin_company_name,$booking_time,$client_city,$client_state,$client_zip,$company_city,$company_state,$company_zip,$company_country,$company_phone,$company_email,$company_address,$get_admin_name);
+    $replacearray = array($service_name, $booking_date , $business_logo, $business_logo_alt, $client_name,$methodname, $units, $addons,$client_email, $client_phone, $payment_status, $final_vc_status, $final_p_status, $client_notes, $client_status,$client_address,$price,$get_admin_name,$firstname,$lastname,'',$request_note,$admin_company_name,$booking_time,$client_city,$client_state,$client_zip,$company_city,$company_state,$company_zip,$company_country,$company_phone,$company_email,$company_address,$get_admin_name);
 
     /* Client template */
     $emailtemplate->email_subject="Appointment Cancelled by you";
@@ -1421,11 +1584,12 @@ if(isset($_POST['update_booking_users'])){
     }else{
         $clienttemplate = base64_decode($clientemailtemplate[3]);
     }
-		$subject=$label_language_values[strtolower(str_replace(" ","_",$clientemailtemplate[1]))];
+		$subject = "Cancellation request received (pending approval) - Order #".$order;
 
     if($setting->get_option('ct_client_email_notification_status') == 'Y' && $clientemailtemplate[4]=='E' ){
 
-        echo $client_email_body = str_replace($searcharray,$replacearray,$clienttemplate);
+        $client_email_body = str_replace($searcharray,$replacearray,$clienttemplate);
+        $client_email_body = '<p><strong>This is a CANCELLATION REQUEST pending Root Admin approval. Your appointment has NOT been cancelled yet.</strong></p>' . $client_email_body;
         if($setting->get_option('ct_smtp_hostname') != '' && $setting->get_option('ct_email_sender_name') != '' && $setting->get_option('ct_email_sender_address') != '' && $setting->get_option('ct_smtp_username') != '' && $setting->get_option('ct_smtp_password') != '' && $setting->get_option('ct_smtp_port') != ''){
             $mail->IsSMTP();
         }else{
@@ -1448,7 +1612,7 @@ if(isset($_POST['update_booking_users'])){
 
 				$headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
 
-				mail($get_staff_email, $subject, $client_email_body, $headers);
+				mail($client_email, $subject, $client_email_body, $headers);
 
 			}
 
@@ -1463,10 +1627,11 @@ if(isset($_POST['update_booking_users'])){
     }else{
         $admintemplate = base64_decode($adminemailtemplate[3]);
     }
-		$adminsubject=$label_language_values[strtolower(str_replace(" ","_",$adminemailtemplate[1]))];
+		$adminsubject = "Cancellation REQUEST pending approval - Order #".$order;
 
     if($setting->get_option('ct_admin_email_notification_status')=='Y' && $adminemailtemplate[4]=='E'){
-        echo $admin_email_body = str_replace($searcharray,$replacearray,$admintemplate);
+        $admin_email_body = str_replace($searcharray,$replacearray,$admintemplate);
+        $admin_email_body = '<p><strong>Customer CANCELLATION REQUEST pending your approval. Appointment has NOT been cancelled yet.</strong></p>' . $admin_email_body;
 
         if($setting->get_option('ct_smtp_hostname') != '' && $setting->get_option('ct_email_sender_name') != '' && $setting->get_option('ct_email_sender_address') != '' && $setting->get_option('ct_smtp_username') != '' && $setting->get_option('ct_smtp_password') != '' && $setting->get_option('ct_smtp_port') != ''){
             $mail_a->IsSMTP();
@@ -1490,15 +1655,16 @@ if(isset($_POST['update_booking_users'])){
 
 				$headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
 
-				mail($get_staff_email, $subject, $admin_email_body, $headers);
+				mail($admin_email, $subject, $admin_email_body, $headers);
 
 			}
     }
-    /*SMS SENDING CODE*/
+    /*SMS SENDING CODE — skip for pending cancel request (emails already sent with pending subjects)*/
+    if (false) {
     /*GET APPROVED SMS TEMPLATE*/
 	/* MESSAGEBIRD CODE */
 		if($setting->get_option("ct_sms_messagebird_status") == "Y"){
-			if ($setting->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
+			if ($client_sms_allowed && $setting->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
 				$template = $objdashboard->gettemplate_sms("CC",'C');
 				$phone = $client_phone;
 				if ($template[4] == "E"){
@@ -1540,6 +1706,7 @@ if(isset($_POST['update_booking_users'])){
 				$messagebird_apikey =$setting->get_option("ct_sms_messagebird_account_apikey");     
 
 				$message = str_replace($searcharray, $replacearray, $message);
+				$message = "[PENDING APPROVAL] " . $message;
 
 				require_once(dirname(dirname(__FILE__)).'/messagebird/vendor/autoload.php');
 				$MessageBird = new \MessageBird\Client($messagebird_apikey);
@@ -1557,7 +1724,7 @@ if(isset($_POST['update_booking_users'])){
 	/* TEXTLOCAL CODE */
 	if($setting->get_option('ct_sms_textlocal_status') == "Y")
 	{
-		if($setting->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
+		if($client_sms_allowed && $setting->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
 			$template = $objdashboard->gettemplate_sms("CC",'C');
 			$phone = $client_phone;				
 			if($template[4] == "E") {
@@ -1606,7 +1773,7 @@ if(isset($_POST['update_booking_users'])){
 		$plivo_sender_number = $setting->get_option('ct_sms_plivo_sender_number');
 		$twilio_sender_number = $setting->get_option('ct_sms_twilio_sender_number');
 		
-        if($setting->get_option('ct_sms_plivo_send_sms_to_client_status') == "Y"){
+        if($client_sms_allowed && $setting->get_option('ct_sms_plivo_send_sms_to_client_status') == "Y"){
             $template = $objdashboard->gettemplate_sms("CC",'C');
             $phone = $client_phone;
             if($template[4] == "E"){
@@ -1651,7 +1818,7 @@ if(isset($_POST['update_booking_users'])){
         }
     }
     if($setting->get_option('ct_sms_twilio_status') == "Y"){
-        if($setting->get_option('ct_sms_twilio_send_sms_to_client_status') == "Y"){
+        if($client_sms_allowed && $setting->get_option('ct_sms_twilio_send_sms_to_client_status') == "Y"){
 			$AccountSid = $setting->get_option('ct_sms_twilio_account_SID');
 			$AuthToken = $setting->get_option('ct_sms_twilio_auth_token'); 
 			$twilliosms_client = new Services_Twilio($AccountSid, $AuthToken);
@@ -1695,7 +1862,7 @@ if(isset($_POST['update_booking_users'])){
         }
     }
 	if($setting->get_option('ct_nexmo_status') == "Y"){
-		if($setting->get_option('ct_sms_nexmo_send_sms_to_client_status') == "Y"){
+		if($client_sms_allowed && $setting->get_option('ct_sms_nexmo_send_sms_to_client_status') == "Y"){
 			$template = $objdashboard->gettemplate_sms("CC",'C');
 			$phone = $client_phone;				
 			if($template[4] == "E") {
@@ -1789,7 +1956,7 @@ if(isset($_POST['update_booking_users'])){
 
 				$headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
 
-				mail($get_staff_email, $subject, $client_email_body, $headers);
+				mail($client_email, $subject, $client_email_body, $headers);
 
 			}
 				}
@@ -1933,6 +2100,8 @@ if(isset($_POST['update_booking_users'])){
 	
 	
     /*SMS SENDING CODE END*/
+    }
+
 }
 
 if(isset($_POST['insert_crm_user_detail'])){

@@ -482,5 +482,20 @@ foreach($get_staff_services as $staff_details){
 $staff_html .= "</select><a href='javascript:void(0)' data-orderid='".$order_id."' class='save_staff_booking edit_staff btn btn-info'><i class='remove_add_fafa_class fa fa-pencil-square-o'></i></a>";
 $appointment_detail['staff'] = $staff_html;
 
+$reqCheck = mysqli_query($conn, "SELECT `change_request_status`, `cancel_reason`, `reschedule_reason`, `reschedule_requested_date` FROM `ct_bookings` WHERE `order_id` = " . (int)$order_id . " LIMIT 1");
+$reqRow = $reqCheck ? mysqli_fetch_assoc($reqCheck) : null;
+$changeRequestHtml = "";
+if ($reqRow) {
+    if ($reqRow['change_request_status'] === 'CANCEL_REQUESTED') {
+        $reason = htmlspecialchars($reqRow['cancel_reason'] ?: 'No reason specified');
+        $changeRequestHtml = "<div class='alert alert-danger' style='margin-top:10px;'><strong><i class='fa fa-exclamation-triangle'></i> Customer Requested Cancellation</strong><br>Reason: {$reason}<br><div style='margin-top:8px;'><button type='button' class='btn btn-xs btn-danger ct-admin-approve-cancel' data-order_id='{$order_id}'>Approve & Cancel Appointment</button> <button type='button' class='btn btn-xs btn-default ct-admin-reject-request' data-order_id='{$order_id}'>Dismiss Request</button></div></div>";
+    } elseif ($reqRow['change_request_status'] === 'RESCHEDULE_REQUESTED') {
+        $reqDate = htmlspecialchars($reqRow['reschedule_requested_date']);
+        $reason = htmlspecialchars($reqRow['reschedule_reason'] ?: 'No reason specified');
+        $changeRequestHtml = "<div class='alert alert-warning' style='margin-top:10px;'><strong><i class='fa fa-clock-o'></i> Customer Requested Reschedule</strong><br>Proposed Date/Time: <b>{$reqDate}</b><br>Reason: {$reason}<br><div style='margin-top:8px;'><button type='button' class='btn btn-xs btn-success ct-admin-approve-reschedule' data-order_id='{$order_id}' data-newdate='{$reqDate}'>Approve Reschedule</button> <button type='button' class='btn btn-xs btn-default ct-admin-reject-request' data-order_id='{$order_id}'>Dismiss Request</button></div></div>";
+    }
+}
+$appointment_detail['change_request_html'] = $changeRequestHtml;
+
 echo json_encode($appointment_detail);
 die();

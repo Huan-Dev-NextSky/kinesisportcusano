@@ -23,6 +23,9 @@ class cleanto_payments{
 	public $tablename="ct_order_client_info";
   public $tablename_request="ct_transfer_request";
   public $special_days;
+  public $staffid;
+  public $email_id;
+  public $transfer_amount_value;
 	
 	/* 
   * Function for add Payments

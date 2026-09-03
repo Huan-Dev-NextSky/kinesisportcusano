@@ -1,4 +1,5 @@
 <?php
+require_once(dirname(dirname(__FILE__)).'/assets/lib/ct_sms_opt_in.php');
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
@@ -398,7 +399,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "book_appointment") {
   }/*** Email Code End ***/ /*SMS SENDING CODE*/ 
 	/* MESSAGEBIRD CODE */
 		if($settings->get_option("ct_sms_messagebird_status") == "Y"){
-			if ($settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
 				$template = $objdashboard->gettemplate_sms("A", 'C');
 				$phone = $client_phone;
 				if ($template[4] == "E"){
@@ -455,7 +456,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "book_appointment") {
 	  }
 	  /* TEXTLOCAL CODE */
   if ($settings->get_option('ct_sms_textlocal_status') == "Y"){
-		if ($settings->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
+		if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
 			$template = $objdashboard->gettemplate_sms("A", 'C');
 			$phone = $client_phone;
 			if ($template[4] == "E"){
@@ -845,7 +846,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "book_appointment") {
   }/*** Email Code End ***/ /*SMS SENDING CODE*/ 
 	/* MESSAGEBIRD CODE */
 		if($settings->get_option("ct_sms_messagebird_status") == "Y"){
-			if ($settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
 				$template = $objdashboard->gettemplate_sms("A", 'C');
 				$phone = $client_phone;
 				if ($template[4] == "E"){
@@ -902,7 +903,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "book_appointment") {
 	  }
 	  /* TEXTLOCAL CODE */
   if ($settings->get_option('ct_sms_textlocal_status') == "Y"){
-		if ($settings->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
+		if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
 			$template = $objdashboard->gettemplate_sms("A", 'C');
 			$phone = $client_phone;
 			if ($template[4] == "E"){

@@ -1,4 +1,5 @@
 <?php      
+require_once(dirname(dirname(__FILE__)).'/assets/lib/ct_sms_opt_in.php');
 header_remove('Access-Control-Allow-Origin');
 header('Access-Control-Allow-Origin: *'); 
 header("Access-Control-Allow-Credentials: true");
@@ -31,6 +32,54 @@ function verifyRequiredParams($required_fields){
 		$invalid = ['status' => "false", "statuscode" => 404, 'response' => $message];
 		setResponse($invalid);
 	}
+}
+
+/** Minutes until booking datetime, accounting for ct_timezone (mirrors portal buffer checks). */
+function ct_api_minutes_until_booking($setting, $first_step, $booking_date_time) {
+	$t_zone_value = $setting->get_option('ct_timezone');
+	$server_timezone = date_default_timezone_get();
+	if (isset($t_zone_value) && $t_zone_value != '') {
+		$offset = $first_step->get_timezone_offset($server_timezone, $t_zone_value);
+		$timezonediff = $offset / 3600;
+	} else {
+		$timezonediff = 0;
+	}
+	if (is_numeric(strpos((string)$timezonediff, '-'))) {
+		$timediffmis = str_replace('-', '', $timezonediff) * 60;
+		$currDateTime_withTZ = strtotime("-" . $timediffmis . " minutes", strtotime(date('Y-m-d H:i:s')));
+	} else {
+		$timediffmis = str_replace('+', '', $timezonediff) * 60;
+		$currDateTime_withTZ = strtotime("+" . $timediffmis . " minutes", strtotime(date('Y-m-d H:i:s')));
+	}
+	$remain = strtotime($booking_date_time) - $currDateTime_withTZ;
+	return (int)round($remain / 60);
+}
+
+/**
+ * Ownership + buffer + pending-request guards for customer cancel/reschedule API.
+ * @param string $mode 'cancel'|'reschedule'
+ */
+function ct_api_guard_customer_booking_change($conn, $objdashboard, $objsettings, $first_step, $order_id, $mode) {
+	$orderdetail = $objdashboard->getclientorder_api($order_id);
+	if (!$orderdetail) {
+		setResponse(["status" => "false", "statuscode" => 404, "response" => "Booking not found"]);
+	}
+	if (!isset($_POST["user_id"]) || (int)$orderdetail[3] !== (int)$_POST["user_id"]) {
+		setResponse(["status" => "false", "statuscode" => 403, "response" => "Not allowed to modify this booking"]);
+	}
+	$buffer_opt = ($mode === 'reschedule') ? 'ct_reshedule_buffer_time' : 'ct_cancellation_buffer_time';
+	$buffer = (int)$objsettings->get_option($buffer_opt);
+	if ($buffer < 0) { $buffer = 0; }
+	$mins_left = ct_api_minutes_until_booking($objsettings, $first_step, $orderdetail[0]);
+	if ($mins_left <= $buffer) {
+		setResponse(["status" => "false", "statuscode" => 403, "response" => "Too close to appointment time"]);
+	}
+	$pendingChk = @mysqli_query($conn, "SELECT `change_request_status` FROM `ct_bookings` WHERE `order_id` = " . (int)$order_id . " LIMIT 1");
+	$pendingRow = ($pendingChk && ($pr = mysqli_fetch_assoc($pendingChk))) ? $pr['change_request_status'] : 'NONE';
+	if ($pendingRow === 'CANCEL_REQUESTED' || $pendingRow === 'RESCHEDULE_REQUESTED') {
+		setResponse(["status" => "false", "statuscode" => 409, "response" => "A change request is already pending"]);
+	}
+	return $orderdetail;
 }
 $filename = dirname(dirname(__FILE__)) . '/config.php';
 $file = file_exists($filename);
@@ -503,7 +552,7 @@ function send_email_and_sms($orderid, $booking_date_time, $service_id, $address,
 	} /*** Email Code End ***/ /*SMS SENDING CODE*/ 
 	/* MESSAGEBIRD CODE */
 		if($settings->get_option("ct_sms_messagebird_status") == "Y"){
-			if ($settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
 				$template = $objdashboard->gettemplate_sms("A", 'C');
 				$phone = $client_phone;
 				if ($template[4] == "E"){
@@ -560,7 +609,7 @@ function send_email_and_sms($orderid, $booking_date_time, $service_id, $address,
 	  }
 	  /* TEXTLOCAL CODE */
   if ($settings->get_option('ct_sms_textlocal_status') == "Y"){
-		if ($settings->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
+		if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
 			$template = $objdashboard->gettemplate_sms("A", 'C');
 			$phone = $client_phone;
 			if ($template[4] == "E"){
@@ -602,7 +651,7 @@ function send_email_and_sms($orderid, $booking_date_time, $service_id, $address,
 		}
   } /*PLIVO CODE*/
 	if ($settings->get_option('ct_sms_plivo_status') == "Y"){
-		if ($settings->get_option('ct_sms_plivo_send_sms_to_client_status') == "Y"){
+		if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_plivo_send_sms_to_client_status') == "Y"){
 			$auth_id = $settings->get_option('ct_sms_plivo_account_SID');
 			$auth_token = $settings->get_option('ct_sms_plivo_auth_token');
 			$p_client = new Plivo\RestAPI($auth_id, $auth_token, '', '');
@@ -651,7 +700,7 @@ function send_email_and_sms($orderid, $booking_date_time, $service_id, $address,
 		}
 	}
 	if ($settings->get_option('ct_sms_twilio_status') == "Y"){
-		if ($settings->get_option('ct_sms_twilio_send_sms_to_client_status') == "Y"){
+		if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_twilio_send_sms_to_client_status') == "Y"){
 			$AccountSid = $settings->get_option('ct_sms_twilio_account_SID');
 			$AuthToken = $settings->get_option('ct_sms_twilio_auth_token');
 			$twilliosms_client = new Services_Twilio($AccountSid, $AuthToken);
@@ -701,7 +750,7 @@ function send_email_and_sms($orderid, $booking_date_time, $service_id, $address,
 		}
 	}
 	if ($settings->get_option('ct_nexmo_status') == "Y"){
-		if ($settings->get_option('ct_sms_nexmo_send_sms_to_client_status') == "Y"){
+		if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_nexmo_send_sms_to_client_status') == "Y"){
 			$template = $objdashboard->gettemplate_sms("A", 'C');
 			$phone = $client_phone;
 			if ($template[4] == "E"){

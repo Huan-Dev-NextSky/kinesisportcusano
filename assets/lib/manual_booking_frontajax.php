@@ -1714,6 +1714,10 @@ if (isset($_POST['cart_item_remove'])) {
 }
 
 if (isset($_POST['open_manual_booking'])) {
+  if ($settings->get_option('ct_allow_manual_booking') === 'N') {
+    echo '<div class="alert alert-danger" style="margin:15px;">Add Manual Booking is disabled in Settings.</div>';
+    exit;
+  }
   include_once (dirname(dirname(dirname(__FILE__))) . '/manual_booking.php');
 }
 

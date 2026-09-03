@@ -524,6 +524,12 @@ if (isset($_POST['btn_submit_app_labels'])) {
   <div class="ct-settings ct-left-menu col-md-3 col-sm-3 col-xs-12 col-lg-3">
     <ul class="nav nav-tab nav-stacked" id="cta-settings-nav">
       <li class="active"><a href="#company-details" class="sot-company-details" data-toggle="pill"><i class="fa fa-building-o fa-2x"></i><br /><?php echo $label_language_values['company']; ?></a></li>
+      <li><a href="#kinesis-api-setting" class="sot-form-fields" data-toggle="pill"><i class="fa fa-plug fa-2x"></i><br />Kinesis API</a></li>
+      <?php
+      if ($gc_hook->gc_purchase_status() == 'exist') {
+        echo $gc_hook->gc_setting_menu_hook();
+      }
+      ?>
       <li><a href="#general-setting" class="sot-general-setting" data-toggle="pill"><i class="fa fa-cog fa-2x"></i><br /><?php echo $label_language_values['general']; ?></a></li>
       <li><a href="#appearance-setting" class="sot-appearance-setting" data-toggle="pill"><i class="fa fa-tachometer fa-2x"></i><br /><?php echo $label_language_values['appearance']; ?></a></li>
       <li><a href="#payment-setting" class="sot-payment-setting" data-toggle="pill"><i class="fa fa-money fa-2x"></i><br /><?php echo $label_language_values['payments_setting']; ?></a></li>
@@ -540,11 +546,6 @@ if (isset($_POST['btn_submit_app_labels'])) {
       <li><a href="#seo-ga" class="sot-form-fields" data-toggle="pill"><i class="fa fa-line-chart fa-2x"></i><br /><?php echo $label_language_values['seo']; ?></a></li>
       <li><a href="#quickbooks" class="sot-form-fields" data-toggle="pill"><i class="fa fa-book fa-2x"></i><br /><?php echo $label_language_values['quickbooks']; ?></a></li>
       <li><a href="#xero" class="sot-form-fields" data-toggle="pill"><i class="fa fa-book fa-2x"></i><br /><?php echo $label_language_values['xero']; ?></a></li>
-      <?php
-      if ($gc_hook->gc_purchase_status() == 'exist') {
-        echo $gc_hook->gc_setting_menu_hook();
-      }
-      ?>
     </ul>
   </div>
   <div class="panel-body">
@@ -1621,6 +1622,126 @@ if (isset($_POST['btn_submit_app_labels'])) {
         </form>
       </div>
 
+      <!-- Kinesis API Settings Tab Pane -->
+      <div class="tab-pane fade in" id="kinesis-api-setting">
+        <div class="panel panel-default">
+          <div class="panel-heading cta-top-right">
+            <h1 class="panel-title">Kinesis API Settings (v3.0)</h1>
+            <span class="pull-right cta-setting-fix-btn"> <a class="btn btn-success save_kinesis_setting" type="submit"><?php echo $label_language_values['save_setting']; ?></a></span>
+          </div>
+          <div class="panel-body pt-50 plr-10">
+            <table class="form-inline ct-common-table">
+              <tbody>
+                <tr>
+                  <td><label>Enable Kinesis API Integration</label></td>
+                  <td>
+                    <div class="form-group">
+                      <label for="kinesis_api_status">
+                        <input class='cta-toggle-checkbox' data-toggle="toggle" data-size="small" type='checkbox' <?php echo ($setting->get_option('kinesis_api_status') == "Y" ? "checked" : ""); ?> id="kinesis_api_status" data-on="<?php echo $label_language_values['enable']; ?>" data-off="<?php echo $label_language_values['disable']; ?>" data-onstyle='success' data-offstyle='danger' />
+                      </label>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><label>Environment</label></td>
+                  <td>
+                    <div class="form-group">
+                      <select class="form-control" id="kinesis_api_env" style="width: 320px;">
+                        <option value="sandbox" <?php echo ($setting->get_option('kinesis_api_env') == "sandbox" || $setting->get_option('kinesis_api_env') == "" ? "selected" : ""); ?>>Sandbox (https://dev-calendar.awwdev.com)</option>
+                        <option value="production" <?php echo ($setting->get_option('kinesis_api_env') == "production" ? "selected" : ""); ?>>Production (https://calendar.awwdev.com)</option>
+                      </select>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><label>API Username / Email</label></td>
+                  <td>
+                    <div class="form-group">
+                      <input type="text" size="70" class="form-control" id="kinesis_api_username" value="<?php echo htmlspecialchars($setting->get_option('kinesis_api_username')); ?>" placeholder="user@domain.com" />
+                      <div id="kinesis_username_error" style="color: red; display: none;">Please enter API username.</div>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><label>API Password</label></td>
+                  <td>
+                    <div class="form-group">
+                      <input type="password" size="70" class="form-control" id="kinesis_api_password" value="<?php echo htmlspecialchars($setting->get_option('kinesis_api_password')); ?>" placeholder="API Password" />
+                      <div id="kinesis_password_error" style="color: red; display: none;">Please enter API password.</div>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><label>Auto Sync Interval</label></td>
+                  <td>
+                    <div class="form-group">
+                      <select class="form-control" id="kinesis_sync_interval" style="width: 200px;">
+                        <option value="2" <?php echo ($setting->get_option('kinesis_sync_interval') == "2" ? "selected" : ""); ?>>Every 2 minutes</option>
+                        <option value="5" <?php echo ($setting->get_option('kinesis_sync_interval') == "5" || $setting->get_option('kinesis_sync_interval') == "" ? "selected" : ""); ?>>Every 5 minutes</option>
+                        <option value="15" <?php echo ($setting->get_option('kinesis_sync_interval') == "15" ? "selected" : ""); ?>>Every 15 minutes</option>
+                        <option value="30" <?php echo ($setting->get_option('kinesis_sync_interval') == "30" ? "selected" : ""); ?>>Every 30 minutes</option>
+                        <option value="60" <?php echo ($setting->get_option('kinesis_sync_interval') == "60" ? "selected" : ""); ?>>Every 1 hour</option>
+                      </select>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><label>Actions & Testing</label></td>
+                  <td>
+                    <div class="form-group" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                      <button type="button" id="btn_test_kinesis_conn" class="btn btn-info btn-sm">
+                        <i class="fa fa-plug"></i> Test Connection
+                      </button>
+                      <button type="button" id="btn_sync_kinesis_services" class="btn btn-primary btn-sm">
+                        <i class="fa fa-cloud-download"></i> Sync Services Now
+                      </button>
+                      <button type="button" id="btn_sync_system_to_kinesis" class="btn btn-success btn-sm">
+                        <i class="fa fa-cloud-upload"></i> Step 2: Sync System &rarr; Kinesis API Now
+                      </button>
+                      <a href="<?php echo BASE_URL; ?>/admin/kinesis-sync.php" class="btn btn-default btn-sm">
+                        <i class="fa fa-history"></i> View Sync History Page
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><label>Connection & Sync Status</label></td>
+                  <td>
+                    <div id="kinesis_status_box" style="margin-top: 5px;">
+                      <div id="kinesis_test_result" style="display: none; padding: 10px; border-radius: 4px; margin-bottom: 8px;"></div>
+                      <div class="mb-5">
+                        <small class="text-muted">
+                          <strong>Services Sync:</strong> <span id="kinesis_last_sync_time"><?php echo $setting->get_option('kinesis_last_sync_time') ? $setting->get_option('kinesis_last_sync_time') : 'Never'; ?></span> | 
+                          <span id="kinesis_last_sync_status"><?php echo $setting->get_option('kinesis_last_sync_status') ? $setting->get_option('kinesis_last_sync_status') : 'Not synced yet'; ?></span>
+                        </small>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                <tr>
+                  <td><label>Cronjob Commands</label></td>
+                  <td>
+                    <div class="well well-sm" style="font-family: monospace; font-size: 12px; margin-bottom: 8px; background-color: #f8f9fa;">
+                      # 1. Sync Services from Kinesis API (every 30 mins):<br />
+                      */30 * * * * php <?php echo dirname(dirname(__FILE__)) . '/cron/aww_import_services.php'; ?> &gt; /dev/null 2&gt;&amp;1<br /><br />
+                      # 2. Step 2: Sync Appointments from System into Kinesis API (every 5 mins):<br />
+                      */5 * * * * php <?php echo dirname(dirname(__FILE__)) . '/cron/sync_system_to_kinesis.php'; ?> &gt; /dev/null 2&gt;&amp;1
+                    </div>
+                    <small class="text-muted">Add these commands to your server crontab (<code>crontab -e</code>) for automated background synchronization.</small>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <?php
+      if ($gc_hook->gc_purchase_status() == 'exist') {
+        echo $gc_hook->gc_settings_menu_content_hook();
+      }
+      ?>
+
       <!-- file upload preview -->
 
       <div class="tab-pane fade in" id="general-setting">
@@ -1839,110 +1960,84 @@ if (isset($_POST['btn_submit_app_labels'])) {
                       </div>
                     </td>
                   </tr>
+                  <?php
+                  $allow_customer_cancel = ($setting->ct_allow_customer_cancel === 'N') ? 'N' : 'Y';
+                  $allow_customer_reschedule = ($setting->ct_allow_customer_reschedule === 'N') ? 'N' : 'Y';
+                  ?>
                   <tr>
-                    <td><label><?php echo $label_language_values['cancellation_buffer_time']; ?></label></td>
+                    <td><label>Allow customer cancel</label></td>
                     <td>
                       <div class="form-group">
-                        <select name="ct_cancellation_buffer_time" id="ct_cancellation_buffer_time" class="selectpicker" data-size="5" style="display: none;">
-                          <option value=""><?php echo $label_language_values['cancellation_buffer_time']; ?></option>
-                          <option value="60" <?php if ($setting->ct_cancellation_buffer_time == '60') {
-                                                echo 'selected';
-                                              } ?>>1 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="120" <?php if ($setting->ct_cancellation_buffer_time == '120') {
-                                                echo 'selected';
-                                              } ?>>2 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="180" <?php if ($setting->ct_cancellation_buffer_time == '180') {
-                                                echo 'selected';
-                                              } ?>>3 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="240" <?php if ($setting->ct_cancellation_buffer_time == '240') {
-                                                echo 'selected';
-                                              } ?>>4 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="300" <?php if ($setting->ct_cancellation_buffer_time == '300') {
-                                                echo 'selected';
-                                              } ?>>5 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="360" <?php if ($setting->ct_cancellation_buffer_time == '360') {
-                                                echo 'selected';
-                                              } ?>>6 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="420" <?php if ($setting->ct_cancellation_buffer_time == '420') {
-                                                echo 'selected';
-                                              } ?>>7 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="480" <?php if ($setting->ct_cancellation_buffer_time == '480') {
-                                                echo 'selected';
-                                              } ?>>8 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="540" <?php if ($setting->ct_cancellation_buffer_time == '540') {
-                                                echo 'selected';
-                                              } ?>>9 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="600" <?php if ($setting->ct_cancellation_buffer_time == '600') {
-                                                echo 'selected';
-                                              } ?>>10 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="660" <?php if ($setting->ct_cancellation_buffer_time == '660') {
-                                                echo 'selected';
-                                              } ?>>11 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="720" <?php if ($setting->ct_cancellation_buffer_time == '720') {
-                                                echo 'selected';
-                                              } ?>>12 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="1440" <?php if ($setting->ct_cancellation_buffer_time == '1440') {
-                                                  echo 'selected';
-                                                } ?>>24 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="2880" <?php if ($setting->ct_cancellation_buffer_time == '2880') {
-                                                  echo 'selected';
-                                                } ?>>48 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="4320" <?php if ($setting->ct_cancellation_buffer_time == '4320') {
-                                                  echo 'selected';
-                                                } ?>>72 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="5760" <?php if ($setting->ct_cancellation_buffer_time == '5760') {
-                                                  echo 'selected';
-                                                } ?>>96 <?php echo $label_language_values['hours']; ?></option>
-                        </select>
+                        <label class="ctoggle-allow-customer-cancel" for="allow-customer-cancel">
+                          <input class="cta-toggle-checkbox" data-toggle="toggle" data-size="small" type="checkbox" name="ct_allow_customer_cancel" <?php if ($allow_customer_cancel == 'Y') { echo 'checked'; } ?> id="allow-customer-cancel" data-on="Yes" data-off="No" data-onstyle="success" data-offstyle="danger" />
+                        </label>
+                        <div class="hide-div mycollapse_allow-customer-cancel" style="margin-top:12px;<?php echo ($allow_customer_cancel == 'Y') ? 'display:block;' : 'display:none;'; ?>">
+                          <label><?php echo $label_language_values['cancellation_buffer_time']; ?></label>
+                          <div class="form-group">
+                            <select name="ct_cancellation_buffer_time" id="ct_cancellation_buffer_time" class="selectpicker" data-size="5" style="display: none;">
+                              <option value=""><?php echo $label_language_values['cancellation_buffer_time']; ?></option>
+                              <option value="60" <?php if ($setting->ct_cancellation_buffer_time == '60') { echo 'selected'; } ?>>1 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="120" <?php if ($setting->ct_cancellation_buffer_time == '120') { echo 'selected'; } ?>>2 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="180" <?php if ($setting->ct_cancellation_buffer_time == '180') { echo 'selected'; } ?>>3 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="240" <?php if ($setting->ct_cancellation_buffer_time == '240') { echo 'selected'; } ?>>4 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="300" <?php if ($setting->ct_cancellation_buffer_time == '300') { echo 'selected'; } ?>>5 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="360" <?php if ($setting->ct_cancellation_buffer_time == '360') { echo 'selected'; } ?>>6 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="420" <?php if ($setting->ct_cancellation_buffer_time == '420') { echo 'selected'; } ?>>7 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="480" <?php if ($setting->ct_cancellation_buffer_time == '480') { echo 'selected'; } ?>>8 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="540" <?php if ($setting->ct_cancellation_buffer_time == '540') { echo 'selected'; } ?>>9 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="600" <?php if ($setting->ct_cancellation_buffer_time == '600') { echo 'selected'; } ?>>10 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="660" <?php if ($setting->ct_cancellation_buffer_time == '660') { echo 'selected'; } ?>>11 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="720" <?php if ($setting->ct_cancellation_buffer_time == '720') { echo 'selected'; } ?>>12 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="1440" <?php if ($setting->ct_cancellation_buffer_time == '1440') { echo 'selected'; } ?>>24 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="2880" <?php if ($setting->ct_cancellation_buffer_time == '2880') { echo 'selected'; } ?>>48 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="4320" <?php if ($setting->ct_cancellation_buffer_time == '4320') { echo 'selected'; } ?>>72 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="5760" <?php if ($setting->ct_cancellation_buffer_time == '5760') { echo 'selected'; } ?>>96 <?php echo $label_language_values['hours']; ?></option>
+                            </select>
+                          </div>
+                          <a class="ct-tooltip-link" href="#" data-toggle="tooltip" title="<?php echo $label_language_values['cancellation_buffer_helps_service_providers_to_avoid_last_minute_cancellation_by_their_clients']; ?>."><i class="fa fa-info-circle fa-lg"></i></a>
+                        </div>
                       </div>
-                      <a class="ct-tooltip-link" href="#" data-toggle="tooltip" title="<?php echo $label_language_values['cancellation_buffer_helps_service_providers_to_avoid_last_minute_cancellation_by_their_clients']; ?>."><i class="fa fa-info-circle fa-lg"></i></a>
                     </td>
                   </tr>
                   <tr>
-                    <td><label><?php echo $label_language_values['reshedule_buffer_time']; ?> </label></td>
+                    <td><label>Allow customer reschedule</label></td>
                     <td>
                       <div class="form-group">
-                        <select class="selectpicker" name="ct_reshedule_buffer_time" id="ct_reshedule_buffer_time" data-size="5" style="display: none;">
-                          <option value=""><?php echo $label_language_values['reshedule_buffer_time']; ?></option>
-                          <option value="60" <?php if ($setting->ct_reshedule_buffer_time == '60') {
-                                                echo 'selected';
-                                              } ?>>1 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="120" <?php if ($setting->ct_reshedule_buffer_time == '120') {
-                                                echo 'selected';
-                                              } ?>>2 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="180" <?php if ($setting->ct_reshedule_buffer_time == '180') {
-                                                echo 'selected';
-                                              } ?>>3 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="240" <?php if ($setting->ct_reshedule_buffer_time == '240') {
-                                                echo 'selected';
-                                              } ?>>4 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="300" <?php if ($setting->ct_reshedule_buffer_time == '300') {
-                                                echo 'selected';
-                                              } ?>>5 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="360" <?php if ($setting->ct_reshedule_buffer_time == '360') {
-                                                echo 'selected';
-                                              } ?>>6 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="420" <?php if ($setting->ct_reshedule_buffer_time == '420') {
-                                                echo 'selected';
-                                              } ?>>7 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="480" <?php if ($setting->ct_reshedule_buffer_time == '480') {
-                                                echo 'selected';
-                                              } ?>>8 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="540" <?php if ($setting->ct_reshedule_buffer_time == '540') {
-                                                echo 'selected';
-                                              } ?>>9 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="600" <?php if ($setting->ct_reshedule_buffer_time == '600') {
-                                                echo 'selected';
-                                              } ?>>10 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="660" <?php if ($setting->ct_reshedule_buffer_time == '660') {
-                                                echo 'selected';
-                                              } ?>>11 <?php echo $label_language_values['hours']; ?></option>
-                          <option value="720" <?php if ($setting->ct_reshedule_buffer_time == '720') {
-                                                echo 'selected';
-                                              } ?>>12 <?php echo $label_language_values['hours']; ?></option>
-                        </select>
+                        <label class="ctoggle-allow-customer-reschedule" for="allow-customer-reschedule">
+                          <input class="cta-toggle-checkbox" data-toggle="toggle" data-size="small" type="checkbox" name="ct_allow_customer_reschedule" <?php if ($allow_customer_reschedule == 'Y') { echo 'checked'; } ?> id="allow-customer-reschedule" data-on="Yes" data-off="No" data-onstyle="success" data-offstyle="danger" />
+                        </label>
+                        <div class="hide-div mycollapse_allow-customer-reschedule" style="margin-top:12px;<?php echo ($allow_customer_reschedule == 'Y') ? 'display:block;' : 'display:none;'; ?>">
+                          <label><?php echo $label_language_values['reshedule_buffer_time']; ?></label>
+                          <div class="form-group">
+                            <select class="selectpicker" name="ct_reshedule_buffer_time" id="ct_reshedule_buffer_time" data-size="5" style="display: none;">
+                              <option value=""><?php echo $label_language_values['reshedule_buffer_time']; ?></option>
+                              <option value="60" <?php if ($setting->ct_reshedule_buffer_time == '60') { echo 'selected'; } ?>>1 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="120" <?php if ($setting->ct_reshedule_buffer_time == '120') { echo 'selected'; } ?>>2 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="180" <?php if ($setting->ct_reshedule_buffer_time == '180') { echo 'selected'; } ?>>3 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="240" <?php if ($setting->ct_reshedule_buffer_time == '240') { echo 'selected'; } ?>>4 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="300" <?php if ($setting->ct_reshedule_buffer_time == '300') { echo 'selected'; } ?>>5 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="360" <?php if ($setting->ct_reshedule_buffer_time == '360') { echo 'selected'; } ?>>6 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="420" <?php if ($setting->ct_reshedule_buffer_time == '420') { echo 'selected'; } ?>>7 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="480" <?php if ($setting->ct_reshedule_buffer_time == '480') { echo 'selected'; } ?>>8 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="540" <?php if ($setting->ct_reshedule_buffer_time == '540') { echo 'selected'; } ?>>9 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="600" <?php if ($setting->ct_reshedule_buffer_time == '600') { echo 'selected'; } ?>>10 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="660" <?php if ($setting->ct_reshedule_buffer_time == '660') { echo 'selected'; } ?>>11 <?php echo $label_language_values['hours']; ?></option>
+                              <option value="720" <?php if ($setting->ct_reshedule_buffer_time == '720') { echo 'selected'; } ?>>12 <?php echo $label_language_values['hours']; ?></option>
+                            </select>
+                          </div>
+                        </div>
                       </div>
-                      <!-- <a class="ct-tooltip-link" href="#" data-toggle="tooltip" title="Lorem ipsem"><i class="fa fa-info-circle fa-lg"></i></a> -->
+                    </td>
+                  </tr>
+                  <?php $allow_manual_booking = ($setting->ct_allow_manual_booking === 'N') ? 'N' : 'Y'; ?>
+                  <tr>
+                    <td><label>Allow Add Manual Booking</label></td>
+                    <td>
+                      <div class="form-group">
+                        <label class="ctoggle-allow-manual-booking" for="allow-manual-booking">
+                          <input class="cta-toggle-checkbox" data-toggle="toggle" data-size="small" type="checkbox" name="ct_allow_manual_booking" <?php if ($allow_manual_booking == 'Y') { echo 'checked'; } ?> id="allow-manual-booking" data-on="Yes" data-off="No" data-onstyle="success" data-offstyle="danger" />
+                        </label>
+                      </div>
                     </td>
                   </tr>
                   <tr>
@@ -3976,10 +4071,10 @@ if (isset($_POST['btn_submit_app_labels'])) {
             <h1 class="panel-title"><?php echo $label_language_values['email_template_settings']; ?></h1>
           </div>
           <!-- Client email templates -->
-          <ul class="nav nav-tabs nav-justified">
-            <li class="active"><a data-toggle="tab" href="#client-email-template"><?php echo $label_language_values['client_email_templates']; ?></a></li>
-            <li><a data-toggle="tab" href="#admin-email-template"><?php echo $label_language_values['admin_email_template']; ?></a></li>
-            <li><a data-toggle="tab" href="#staff-email-template"><?php echo $label_language_values['staff_email_template']; ?></a></li>
+          <ul class="nav nav-tabs nav-justified ct-segment-tabs">
+            <li class="active"><a data-toggle="tab" href="#client-email-template"><i class="fa fa-user"></i><?php echo $label_language_values['client_email_templates']; ?></a></li>
+            <li><a data-toggle="tab" href="#admin-email-template"><i class="fa fa-shield"></i><?php echo $label_language_values['admin_email_template']; ?></a></li>
+            <li><a data-toggle="tab" href="#staff-email-template"><i class="fa fa-user-md"></i><?php echo $label_language_values['staff_email_template']; ?></a></li>
           </ul>
           <div class="tab-content">
             <div id="client-email-template" class="tab-pane fade in active">
@@ -4982,10 +5077,10 @@ if (isset($_POST['btn_submit_app_labels'])) {
             <h1 class="panel-title"><?php echo $label_language_values['sms_template_settings']; ?></h1>
           </div>
           <!-- Client email templates -->
-          <ul class="nav nav-tabs nav-justified">
-            <li class="active"><a data-toggle="tab" href="#client-sms-template"><?php echo $label_language_values['client_sms_templates']; ?></a></li>
-            <li><a data-toggle="tab" href="#admin-sms-template"><?php echo $label_language_values['admin_sms_template']; ?></a></li>
-            <li><a data-toggle="tab" href="#staff-sms-template">Staff SMS Template</a></li>
+          <ul class="nav nav-tabs nav-justified ct-segment-tabs">
+            <li class="active"><a data-toggle="tab" href="#client-sms-template"><i class="fa fa-user"></i><?php echo $label_language_values['client_sms_templates']; ?></a></li>
+            <li><a data-toggle="tab" href="#admin-sms-template"><i class="fa fa-shield"></i><?php echo $label_language_values['admin_sms_template']; ?></a></li>
+            <li><a data-toggle="tab" href="#staff-sms-template"><i class="fa fa-user-md"></i>Staff SMS Template</a></li>
 
           </ul>
           <div class="tab-content">
@@ -5638,13 +5733,13 @@ if (isset($_POST['btn_submit_app_labels'])) {
           <div class="panel-heading">
             <h1 class="panel-title"><?php echo $label_language_values['promocode_header']; ?></h1>
           </div>
-          <ul class="nav nav-tabs">
-            <li class="promocode-list-li active"><a data-toggle="tab" href="#promocode-list"><?php echo $label_language_values['promocodes']; ?></a></li>
-            <li class="add_promocode"><a data-toggle="tab" href="#add-new-promocode"><?php echo $label_language_values['add_new']; ?></a></li>
-            <li id="update-promocode" class="ct-update-promocode-li hide-div"><a data-toggle="tab" class="ct-update-promocode" href="#"><?php echo $label_language_values['update_promocode']; ?></a></li>
-            <li class="special_offer"><a data-toggle="tab" href="#special_offer"><?php echo "Add Special Offer"; ?></a></li>
-            <li class="special-offer-list"><a data-toggle="tab" href="#special-offer-list"><?php echo $label_language_values['ct_special_offer']; ?></a></li>
-            <li id="ct-update-special-offer" class="ct-update-specoff-li hide-div"><a data-toggle="tab" class="ct-update-specialoff" href="#"><?php echo $label_language_values['update_promocode']; ?></a></li>
+          <ul class="nav nav-tabs ct-segment-tabs">
+            <li class="promocode-list-li active"><a data-toggle="tab" href="#promocode-list"><i class="fa fa-ticket"></i><?php echo $label_language_values['promocodes']; ?></a></li>
+            <li class="add_promocode"><a data-toggle="tab" href="#add-new-promocode"><i class="fa fa-plus"></i><?php echo $label_language_values['add_new']; ?></a></li>
+            <li id="update-promocode" class="ct-update-promocode-li hide-div"><a data-toggle="tab" class="ct-update-promocode" href="#"><i class="fa fa-pencil"></i><?php echo $label_language_values['update_promocode']; ?></a></li>
+            <li class="special_offer"><a data-toggle="tab" href="#special_offer"><i class="fa fa-gift"></i><?php echo "Add Special Offer"; ?></a></li>
+            <li class="special-offer-list"><a data-toggle="tab" href="#special-offer-list"><i class="fa fa-list"></i><?php echo $label_language_values['ct_special_offer']; ?></a></li>
+            <li id="ct-update-special-offer" class="ct-update-specoff-li hide-div"><a data-toggle="tab" class="ct-update-specialoff" href="#"><i class="fa fa-pencil"></i><?php echo $label_language_values['update_promocode']; ?></a></li>
           </ul>
           <div class="tab-content">
             <div id="promocode-list" class="tab-pane fade in active edit_form_for_coupon">
@@ -7372,11 +7467,6 @@ if (isset($_POST['btn_submit_app_labels'])) {
           </div>
         </div>
       </div>
-      <?php
-      if ($gc_hook->gc_purchase_status() == 'exist') {
-        echo $gc_hook->gc_settings_menu_content_hook();
-      }
-      ?>
     </div>
   </div>
 </div>
@@ -7420,6 +7510,325 @@ if (isset($_POST['btn_submit_app_labels'])) {
   var imgObj = {
     'img_url': '<?php echo SITE_URL . 'assets/images/'; ?>'
   };
+
+  /* Kinesis API Settings Handlers */
+  jQuery(document).on("click", ".save_kinesis_setting", function (e) {
+    e.preventDefault();
+    var status = jQuery("#kinesis_api_status").prop('checked') ? 'Y' : 'N';
+    var env = jQuery("#kinesis_api_env").val();
+    var username = jQuery("#kinesis_api_username").val().trim();
+    var password = jQuery("#kinesis_api_password").val().trim();
+    var interval = jQuery("#kinesis_sync_interval").val();
+
+    jQuery(".ct-loading-main").show();
+    jQuery.ajax({
+      type: "post",
+      url: ajax_url + "setting_ajax.php",
+      data: {
+        action: "update_kinesis_setting",
+        status: status,
+        env: env,
+        username: username,
+        password: password,
+        interval: interval
+      },
+      success: function (res) {
+        jQuery(".ct-loading-main").hide();
+        jQuery("#kinesis_test_result").removeClass("alert-danger alert-info").addClass("alert alert-success").html('<i class="fa fa-check-circle"></i> Kinesis API settings saved successfully!').slideDown().delay(4000).slideUp();
+      },
+      error: function() {
+        jQuery(".ct-loading-main").hide();
+        jQuery("#kinesis_test_result").removeClass("alert-success alert-info").addClass("alert alert-danger").html('<i class="fa fa-exclamation-triangle"></i> Failed to save settings.').slideDown();
+      }
+    });
+  });
+
+  jQuery(document).on("click", "#btn_test_kinesis_conn", function (e) {
+    e.preventDefault();
+    var env = jQuery("#kinesis_api_env").val();
+    var username = jQuery("#kinesis_api_username").val().trim();
+    var password = jQuery("#kinesis_api_password").val().trim();
+
+    if (!username || !password) {
+      jQuery("#kinesis_test_result").removeClass("alert-success alert-info").addClass("alert alert-danger").html('<i class="fa fa-exclamation-triangle"></i> Please enter API username and password before testing.').slideDown();
+      return;
+    }
+
+    var $btn = jQuery(this);
+    var origHtml = $btn.html();
+    $btn.prop("disabled", true).html('<i class="fa fa-spinner fa-spin"></i> Testing...');
+    jQuery("#kinesis_test_result").slideUp();
+
+    jQuery.ajax({
+      type: "post",
+      url: ajax_url + "setting_ajax.php",
+      dataType: "json",
+      data: {
+        action: "test_kinesis_connection",
+        env: env,
+        username: username,
+        password: password
+      },
+      success: function (res) {
+        $btn.prop("disabled", false).html(origHtml);
+        if (res.success) {
+          jQuery("#kinesis_test_result").removeClass("alert-danger alert-info").addClass("alert alert-success").html('<i class="fa fa-check-circle"></i> ' + res.message).slideDown();
+        } else {
+          jQuery("#kinesis_test_result").removeClass("alert-success alert-info").addClass("alert alert-danger").html('<i class="fa fa-times-circle"></i> ' + res.message).slideDown();
+        }
+      },
+      error: function (xhr) {
+        $btn.prop("disabled", false).html(origHtml);
+        jQuery("#kinesis_test_result").removeClass("alert-success alert-info").addClass("alert alert-danger").html('<i class="fa fa-exclamation-triangle"></i> Server error occurred while connecting.').slideDown();
+      }
+    });
+  });
+
+  jQuery(document).on("click", "#btn_sync_kinesis_services", function (e) {
+    e.preventDefault();
+    var $btn = jQuery(this);
+    var origHtml = $btn.html();
+    $btn.prop("disabled", true).html('<i class="fa fa-spinner fa-spin"></i> Syncing...');
+
+    jQuery.ajax({
+      type: "post",
+      url: ajax_url + "setting_ajax.php",
+      dataType: "json",
+      data: {
+        action: "sync_kinesis_services"
+      },
+      success: function (res) {
+        $btn.prop("disabled", false).html(origHtml);
+        if (res.success) {
+          jQuery("#kinesis_test_result").removeClass("alert-danger alert-info").addClass("alert alert-success").html('<i class="fa fa-check-circle"></i> ' + res.message).slideDown();
+          if (res.lastSync) {
+            jQuery("#kinesis_last_sync_time").text(res.lastSync);
+            jQuery("#kinesis_last_sync_status").text('SUCCESS (' + res.total + ' services)');
+          }
+        } else {
+          jQuery("#kinesis_test_result").removeClass("alert-success alert-info").addClass("alert alert-danger").html('<i class="fa fa-times-circle"></i> ' + res.message).slideDown();
+        }
+      },
+      error: function () {
+        $btn.prop("disabled", false).html(origHtml);
+        jQuery("#kinesis_test_result").removeClass("alert-success alert-info").addClass("alert alert-danger").html('<i class="fa fa-exclamation-triangle"></i> Error triggering sync.').slideDown();
+      }
+    });
+  });
+
+  jQuery(document).on("click", "#btn_sync_system_to_kinesis", function (e) {
+    e.preventDefault();
+    var $btn = jQuery(this);
+    var origHtml = $btn.html();
+    $btn.prop("disabled", true).html('<i class="fa fa-spinner fa-spin"></i> Syncing System &rarr; Kinesis...');
+
+    jQuery.ajax({
+      type: "post",
+      url: ajax_url + "setting_ajax.php",
+      dataType: "json",
+      data: {
+        action: "sync_system_to_kinesis"
+      },
+      success: function (res) {
+        $btn.prop("disabled", false).html(origHtml);
+        if (res.success) {
+          jQuery("#kinesis_test_result").removeClass("alert-danger alert-info").addClass("alert alert-success").html('<i class="fa fa-check-circle"></i> ' + res.message).slideDown();
+          fetchSyncHistory();
+        } else {
+          jQuery("#kinesis_test_result").removeClass("alert-success alert-info").addClass("alert alert-danger").html('<i class="fa fa-times-circle"></i> ' + res.message).slideDown();
+        }
+      },
+      error: function () {
+        $btn.prop("disabled", false).html(origHtml);
+        jQuery("#kinesis_test_result").removeClass("alert-success alert-info").addClass("alert alert-danger").html('<i class="fa fa-exclamation-triangle"></i> Error triggering System to Kinesis sync.').slideDown();
+      }
+    });
+  });
+
+  /* =========================================================================
+   * Sync History Manager
+   * ========================================================================= */
+  function fetchSyncHistory() {
+    var type = jQuery("#sync_type_filter button.active").data("type") || "all";
+    var status = jQuery("#sync_status_filter").val() || "all";
+    var search = jQuery("#sync_search_input").val().trim();
+    var limit = jQuery("#sync_limit_select").val() || 50;
+
+    var $tbody = jQuery("#sync_history_tbody");
+    $tbody.html('<tr><td colspan="11" class="text-center text-muted" style="padding: 25px;"><i class="fa fa-spinner fa-spin fa-2x"></i><br /><span style="margin-top: 5px; display: inline-block;">Loading sync history...</span></td></tr>');
+
+    jQuery.ajax({
+      type: "post",
+      url: ajax_url + "setting_ajax.php",
+      dataType: "json",
+      data: {
+        action: "get_sync_history",
+        type: type,
+        status: status,
+        search: search,
+        limit: limit
+      },
+      success: function (res) {
+        if (!res.success || !res.logs || res.logs.length === 0) {
+          $tbody.html('<tr><td colspan="11" class="text-center text-muted" style="padding: 30px;"><i class="fa fa-info-circle fa-2x"></i><br />No synchronization history found matching your filters.</td></tr>');
+          updateSyncStats(res.stats);
+          return;
+        }
+
+        updateSyncStats(res.stats);
+
+        var html = "";
+        jQuery.each(res.logs, function (i, row) {
+          var syncTime = row.updated_at || row.created_at || "-";
+          var orderId = row.local_order_id ? ('#' + row.local_order_id) : (row.local_booking_id ? ('Bk #' + row.local_booking_id) : '-');
+          var custName = row.customer_name || 'Guest';
+          var custEmail = row.customer_email || '';
+          var custPhone = row.customer_phone || '';
+          var apptDate = row.event_start || row.booking_date_time || '-';
+          var serviceName = row.service_name || row.event_summary || 'Service';
+          var staffName = row.staff_name ? ('<br /><small class="text-muted"><i class="fa fa-user-md"></i> ' + row.staff_name + '</small>') : '';
+
+          // GCal Badge
+          var gcalBadge = '<span class="text-muted">-</span>';
+          if (row.google_event_id) {
+            var shortGId = row.google_event_id.length > 10 ? (row.google_event_id.substring(0, 10) + '...') : row.google_event_id;
+            gcalBadge = '<span class="label label-info" title="Google Event ID: ' + row.google_event_id + '"><i class="fa fa-google"></i> ' + shortGId + '</span>';
+          }
+
+          // Kinesis ID Badges
+          var kinesisBadges = '<span class="text-muted">None</span>';
+          if (row.kinesis_appointment_id && row.kinesis_appointment_id > 0) {
+            kinesisBadges = '<span class="label label-primary" title="Kinesis Appointment ID">Appt #' + row.kinesis_appointment_id + '</span>';
+            if (row.kinesis_customer_id && row.kinesis_customer_id > 0) {
+              kinesisBadges += ' <span class="label label-default" title="Kinesis Customer ID">Cust #' + row.kinesis_customer_id + '</span>';
+            }
+          }
+
+          // Action Badge
+          var actionBadge = '<span class="label label-default">' + (row.sync_action || 'SYNC') + '</span>';
+          if (row.sync_action === 'CREATE') {
+            actionBadge = '<span class="label label-success">CREATE</span>';
+          } else if (row.sync_action === 'UPDATE') {
+            actionBadge = '<span class="label label-warning">UPDATE</span>';
+          } else if (row.sync_action === 'CANCEL') {
+            actionBadge = '<span class="label label-danger">CANCEL</span>';
+          }
+
+          // Status Badge
+          var statusBadge = '<span class="label label-default">' + (row.sync_status || 'UNKNOWN') + '</span>';
+          if (row.sync_status === 'SYNCED') {
+            statusBadge = '<span class="label label-success"><i class="fa fa-check"></i> SYNCED</span>';
+          } else if (row.sync_status === 'PENDING') {
+            statusBadge = '<span class="label label-warning"><i class="fa fa-clock-o"></i> PENDING</span>';
+          } else if (row.sync_status === 'CANCELLED') {
+            statusBadge = '<span class="label label-danger"><i class="fa fa-ban"></i> CANCELLED</span>';
+          } else if (row.sync_status === 'FAILED') {
+            statusBadge = '<span class="label label-danger"><i class="fa fa-times"></i> FAILED</span>';
+          }
+
+          var msg = row.last_sync_message || '-';
+
+          // Action Button
+          var actionBtn = '-';
+          if (row.sync_status === 'PENDING' && row.local_order_id) {
+            actionBtn = '<button type="button" class="btn btn-xs btn-success btn-sync-single-order" data-order-id="' + row.local_order_id + '" title="Sync this appointment now to Kinesis API"><i class="fa fa-upload"></i> Sync</button>';
+          }
+
+          html += '<tr>' +
+            '<td style="white-space: nowrap;"><small>' + syncTime + '</small></td>' +
+            '<td><strong>' + orderId + '</strong></td>' +
+            '<td><strong>' + custName + '</strong><br /><small class="text-muted">' + custEmail + (custPhone ? (' | ' + custPhone) : '') + '</small></td>' +
+            '<td style="white-space: nowrap;"><small>' + apptDate + '</small></td>' +
+            '<td>' + serviceName + staffName + '</td>' +
+            '<td>' + gcalBadge + '</td>' +
+            '<td>' + kinesisBadges + '</td>' +
+            '<td>' + actionBadge + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td><small>' + msg + '</small></td>' +
+            '<td style="text-align: center;">' + actionBtn + '</td>' +
+            '</tr>';
+        });
+
+        $tbody.html(html);
+      },
+      error: function () {
+        $tbody.html('<tr><td colspan="11" class="text-center text-danger" style="padding: 25px;"><i class="fa fa-exclamation-triangle"></i> Failed to load sync history.</td></tr>');
+      }
+    });
+  }
+
+  function updateSyncStats(stats) {
+    if (!stats) return;
+    jQuery("#stat_total").text(stats.total_count || 0);
+    jQuery("#stat_synced").text(stats.synced_count || 0);
+    jQuery("#stat_pending").text(stats.pending_count || 0);
+    jQuery("#stat_cancelled").text(stats.cancelled_count || 0);
+    jQuery("#stat_gcal").text(stats.gcal_count || 0);
+    jQuery("#stat_kinesis").text(stats.kinesis_count || 0);
+  }
+
+  jQuery(document).on("click", "#btn_refresh_sync_history", function () {
+    fetchSyncHistory();
+  });
+
+  jQuery(document).on("click", "#sync_type_filter button", function () {
+    jQuery("#sync_type_filter button").removeClass("active");
+    jQuery(this).addClass("active");
+    fetchSyncHistory();
+  });
+
+  jQuery(document).on("change", "#sync_status_filter, #sync_limit_select", function () {
+    fetchSyncHistory();
+  });
+
+  jQuery(document).on("click", "#btn_sync_search", function () {
+    fetchSyncHistory();
+  });
+
+  jQuery(document).on("keypress", "#sync_search_input", function (e) {
+    if (e.which === 13) {
+      e.preventDefault();
+      fetchSyncHistory();
+    }
+  });
+
+  jQuery(document).on("click", ".btn-sync-single-order", function (e) {
+    e.preventDefault();
+    var $btn = jQuery(this);
+    var orderId = $btn.data("order-id");
+    $btn.prop("disabled", true).html('<i class="fa fa-spinner fa-spin"></i>');
+
+    jQuery.ajax({
+      type: "post",
+      url: ajax_url + "setting_ajax.php",
+      dataType: "json",
+      data: {
+        action: "sync_single_order_to_kinesis",
+        order_id: orderId
+      },
+      success: function (res) {
+        if (res.success) {
+          fetchSyncHistory();
+        } else {
+          alert(res.error || "Failed to sync order.");
+          $btn.prop("disabled", false).html('<i class="fa fa-upload"></i> Sync');
+        }
+      },
+      error: function () {
+        alert("Server error occurred while syncing order.");
+        $btn.prop("disabled", false).html('<i class="fa fa-upload"></i> Sync');
+      }
+    });
+  });
+
+  // Load history when tab is clicked or page loads
+  jQuery(document).on("click", "a[href='#kinesis-api-setting']", function () {
+    fetchSyncHistory();
+  });
+
+  if (window.location.hash === '#kinesis-api-setting') {
+    fetchSyncHistory();
+  }
 </script>
 <?php
 if ($gc_hook->gc_purchase_status() == 'exist') {

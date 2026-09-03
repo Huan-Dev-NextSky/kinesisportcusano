@@ -28,7 +28,7 @@ if($file){
 ob_start();
 session_start();
 include(dirname(dirname(__FILE__)).'/header.php');
-if(!isset($_SESSION['ct_staffid']) && !isset($_SESSION['ct_login_user_id']))
+if(!isset($_SESSION['ct_staffid']))
 {
     ?>
     <script>
@@ -37,6 +37,7 @@ if(!isset($_SESSION['ct_staffid']) && !isset($_SESSION['ct_login_user_id']))
         window.location=login_url+"admin/";
     </script>
 <?php  
+    exit;
 }
 include(dirname(dirname(__FILE__)) . '/class_configure.php');
 include(dirname(dirname(__FILE__))."/objects/class_dashboard.php");
@@ -431,6 +432,15 @@ else
 	#cta #cta-main-navigation .navbar-inverse{
 		background:".$setting->get_option('ct_primary_color_admin')." !important;
 	}
+	#cta .ct-segment-tabs > li > a:hover {
+		color: ".$setting->get_option('ct_primary_color_admin')." !important;
+	}
+	#cta .ct-segment-tabs > li.active > a,
+	#cta .ct-segment-tabs > li.active > a:hover,
+	#cta .ct-segment-tabs > li.active > a:focus {
+		background: ".$setting->get_option('ct_primary_color_admin')." !important;
+		color: #fff !important;
+	}
 	#cta #cta-main-navigation .navbar .nav.cta-nav-tab > .active > a,
 	#cta #cta-main-navigation .navbar .nav.user-nav-bar > .active > a,
 	#cta #cta-top-nav .navbar .nav > .active > a:focus{
@@ -617,27 +627,53 @@ else
         if(isset($_SESSION['ct_staffid']))
         {
         ?>
-		<div id="cta-top-nav" class="navbar-inner staff-nav">
+		<div id="cta-top-nav" class="navbar-inner">
             <nav role="navigation" class="navbar navbar-inverse navbar-fixed-top">
-                <!-- Brand and toggle get grouped for better mobile display -->
-				<div class="col-md-12">
-                <div class="navbar-header">
-                    <button type="button" data-target="#navbarCollapseMain" data-toggle="collapse" class="navbar-toggle">
-                        <span class="sr-only">Toggle navigation</span>
-                        <i class="fa fa-cog"></i>
-                    </button>
-                    <a href="<?php echo BASE_URL; ?>" class="navbar-brand"><?php echo $setting->get_option('ct_company_name')." | Staff";?></a>
+                <div class="container">
+                    <div class="navbar-header">
+                        <button type="button" data-target="#navbarCollapsetop" style="float:right" data-toggle="collapse" class="navbar-toggle">
+                            <span class="sr-only">Toggle navigation</span>
+                            <i class="fa fa-cog"></i>
+                        </button>
+                        <a href="<?php echo BASE_URL; ?>" class="navbar-brand"><?php echo $setting->get_option('ct_company_name'); ?> | Doctor</a>
+                    </div>
+                    <div id="navbarCollapsetop" class="collapse navbar-collapse">
+                        <ul class="nav navbar-nav navbar-right">
+                            <li><a href="#my-profile" class="my-profile" data-toggle="pill"><i class="fa fa-user"></i><span><?php echo $label_language_values['profile']; ?></span></a></li>
+                            <li><a id="logout" href="javascript:void(0)"><i class="fa fa-power-off"></i><span><?php echo $label_language_values['logout']; ?></span></a></li>
+                        </ul>
+                    </div>
                 </div>
-                <!-- Collection of nav links and other content for toggling 
-                <div id="navbarCollapsetop" class="collapse navbar-collapse">
-					<ul class="nav navbar-nav navbar-right cta-right-nav-icons">
-						<li><a href="<?php echo SITE_URL . "admin/" ?>"><img height="32" width="32" class="profile-img br-100" src="<?php echo BASE_URL; ?>/assets/images/services/staff_30618.jpg" /></a></li>
-					</ul> 
-                </div>-->
-				</div>
             </nav>
-        </div><!-- top bar end here -->
-		
+        </div>
+
+        <div id="cta-main-navigation" class="navbar-inner">
+            <nav role="navigation" class="navbar navbar-inverse navbar-fixed-top cta-admin-nav">
+                <div class="container">
+                    <div class="navbar-header">
+                        <button type="button" style="float:right" data-target="#navbarCollapseMain" data-toggle="collapse" class="navbar-toggle">
+                            <span class="sr-only">Toggle navigation</span>
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <a href="javascript:void(0);" class="navbar-brand">Menu</a>
+                    </div>
+                    <div id="navbarCollapseMain" class="collapse navbar-collapse">
+                        <ul class="nav navbar-nav cta-nav-tab" id="cta-staff-nav">
+                            <li class="active">
+                                <a href="#my-bookings" class="my-bookings" data-toggle="pill">
+                                    <i class="fa fa-calendar"></i><span><?php echo $label_language_values['bookings']; ?></span>
+                                </a>
+                            </li>
+                            <li>
+                                <a href="#my-schedule" class="my-schedule" data-toggle="pill">
+                                    <i class="fa fa-clock-o"></i><span><?php echo $label_language_values['schedule']; ?></span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </nav>
+        </div>
 	    <?php   }?>
 	
 	 </header>

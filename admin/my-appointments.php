@@ -97,14 +97,7 @@ if (isset($_SESSION['ct_login_user_id']))
             	<?php  }  else  { ?>                                    
             	<td><?php echo date(" H:i", strtotime($dd['booking_date_time'])); ?></td>       
             	<?php  } ?>                                
-            	<td><a href="#user-booking-details<?php if(isset($dd['order_id'])){ echo $dd['order_id']; }else{ } ?>" data-toggle="modal" data-target="#user-booking-details<?php if(isset($dd['order_id'])){ echo $dd['order_id']; }else{ } ?>" class="ct-my-booking-user btn btn-info myappointment_popup"><i class="fa fa-eye"></i><?php echo $label_language_values['my_appointments']; ?></a> 
-              <?php 
-              $book_date = date("Y-m-d H:i:s", strtotime($dd['booking_date_time']));
-              $curr_date = date("Y-m-d H:i:s");
-              if($book_date >= $curr_date){ ?>
-							<button class="btn btn-primary edit-booking" data-id="<?php if(isset($dd['order_id'])){ echo $dd['order_id']; }else{ } ?>"><i class='remove_add_fafa_class fa fa-pencil-square-o'></i><?php echo "Edit Booking Detail"; ?></button>
-              <?php } ?>						
-            	</td>                                
+            	<td><a href="#user-booking-details<?php if(isset($dd['order_id'])){ echo $dd['order_id']; }else{ } ?>" data-toggle="modal" data-target="#user-booking-details<?php if(isset($dd['order_id'])){ echo $dd['order_id']; }else{ } ?>" class="ct-my-booking-user btn btn-info myappointment_popup"><i class="fa fa-eye"></i><?php echo $label_language_values['my_appointments']; ?></a></td>                                
             	<td><?php if ($dd["recurrence_status"] == "Y" && strtotime($dd['booking_date_time']) >= $currDateTime_withTZ)
 		        {
 		            $frequently_discount->id = $dd['frequently_discount'];
@@ -134,8 +127,12 @@ if (isset($_SESSION['ct_login_user_id']))
             	</div><?php
             }
         } ?>            
+        <?php
+        $payment_status_row = isset($dd['payment_status']) ? $dd['payment_status'] : '';
+        if ($payment_status_row === 'Completed') { ?>
         <a target="_blank" href="<?php echo BASE_URL; ?>/assets/lib/download_invoice_client.php?iid=<?php if(isset($dd['order_id'])){ echo $dd['order_id']; }else{ } ?>" class="btn btn-primary"><i class="fa fa-download"></i><?php echo $label_language_values['download_invoice']; ?>
-        </a>									
+        </a>
+        <?php } ?>
         <?php $rating_review->order_id = $dd['order_id'];
         $rating = $rating_review->select_one();
         $bt = date("Y-m-d H:i:s", strtotime($dd['booking_date_time']));
@@ -304,7 +301,13 @@ if (isset($_SESSION['ct_login_user_id']))
         {
             $dd['booking_status'] == 'MN';
             $booking_stats = '<i class="fa fa-thumbs-o-down txt-danger">' . $label_language_values['mark_as_no_show'] . '</i>';
-        } ?><?php echo $booking_stats; ?>												
+        } ?>
+		<?php echo $booking_stats; ?>
+		<?php if (isset($dd['change_request_status']) && $dd['change_request_status'] === 'CANCEL_REQUESTED') { ?>
+			<br><span class="label label-warning" style="display:inline-block; margin-top:4px;"><i class="fa fa-hourglass-half"></i> Cancellation Requested (Pending Admin)</span>
+		<?php } elseif (isset($dd['change_request_status']) && $dd['change_request_status'] === 'RESCHEDULE_REQUESTED') { ?>
+			<br><span class="label label-info" style="display:inline-block; margin-top:4px;"><i class="fa fa-hourglass-half"></i> Reschedule Requested (Pending Admin)</span>
+		<?php } ?>
         </td>												
         <td><?php $t_zone_value = $setting->get_option('ct_timezone');
         $server_timezone = date_default_timezone_get();
@@ -340,6 +343,8 @@ if (isset($_SESSION['ct_login_user_id']))
                 $booking_start_datetime = strtotime(date('Y-m-d H:i:s', strtotime($dd['booking_date_time'])));
                 $reschedule_buffer_time = $setting->get_option('ct_reshedule_buffer_time');
                 $cancellation_buffer_time = $setting->get_option('ct_cancellation_buffer_time');
+                $allow_customer_cancel = ($setting->get_option('ct_allow_customer_cancel') === 'N') ? 'N' : 'Y';
+                $allow_customer_reschedule = ($setting->get_option('ct_allow_customer_reschedule') === 'N') ? 'N' : 'Y';
                 $t_zone_value = $setting->get_option('ct_timezone');
                 $server_timezone = date_default_timezone_get();
                 if (isset($t_zone_value) && $t_zone_value != '')
@@ -365,12 +370,16 @@ if (isset($_SESSION['ct_login_user_id']))
                 $current_time = strtotime($current_times);
                 $remain_times = $booking_start_datetime - $current_time;
                 $time_in_min = round($remain_times / 60);
-                if ($time_in_min > $reschedule_buffer_time)
+                $pendingReq = isset($dd['change_request_status']) ? $dd['change_request_status'] : 'NONE';
+                $hasPendingReq = ($pendingReq === 'CANCEL_REQUESTED' || $pendingReq === 'RESCHEDULE_REQUESTED');
+                if ($hasPendingReq) { ?>
+					<a href="javascript:void(0)" class="btn btn-warning ct-small-btn" title="Pending admin approval"><i class="fa fa-hourglass-half"></i> Request Pending</a>
+				<?php } else {
+                if ($allow_customer_reschedule === 'Y' && $time_in_min > $reschedule_buffer_time)
                 { ?>
-                <a id="ct-reschedual-appointment" class="btn btn-info ct-small-btn rescedual_book ct-reschedual-appointment-cal" data-id="<?php if(isset($dd['order_id'])){ echo $dd['order_id']; }else{ }?>" data-dismiss="modal" title="Rescheduled"><i class="fa fa-repeat"></i><?php echo $label_language_values['reschedule']; ?></a>																
-                <?php
-                }
-                else
+                <a data-toggle="modal" href="javascript:void(0)" data-total_price="<?php echo $general->ct_price_format($dd['total_payment'],$symbol_position,$decimal);?>" data-target="#update-user-booking-details<?php if(isset($dd['order_id'])){ echo $dd['order_id']; }else{ } ?>" class="btn btn-info ct-small-btn display_myappointment_data" data-order_id="<?php if(isset($dd['order_id'])){ echo $dd['order_id']; }else{ } ?>" title="Reschedule"><i class="fa fa-repeat"></i><?php echo $label_language_values['reschedule']; ?></a>
+                <?php }
+                else if ($allow_customer_reschedule === 'Y')
                 {
                     if ($booking_start_datetime > $current_time)
                     { ?>																	
@@ -381,12 +390,11 @@ if (isset($_SESSION['ct_login_user_id']))
                         echo '';
                     }
                 } ?>															
-                <?php if ($time_in_min > $cancellation_buffer_time)
+                <?php if ($allow_customer_cancel === 'Y' && $time_in_min > $cancellation_buffer_time)
                 { ?>																
                 	<a id="ct-user-cancel-appointment<?php echo $dd['order_id'] ?>" data-id="<?php if(isset($dd['order_id'])){ echo $dd['order_id']; }else{ } ?>" class="btn btn-danger cancel_appointment"  rel="popover" data-placement='left' title="<?php echo $label_language_values['booking_cancel_reason']; ?>?"><i class="fa fa-ban" style="margin-right: 5px;"></i><?php echo $label_language_values['cancel']; ?></a>			
-                	<?php
-                }
-                else
+                	<?php }
+                else if ($allow_customer_cancel === 'Y')
                 {
                     if ($booking_start_datetime > $current_time)
                     { ?>																	
@@ -397,6 +405,7 @@ if (isset($_SESSION['ct_login_user_id']))
                     {
                         echo '';
                     }
+                }
                 } ?>															
                 <div id="popover-user-cancel-appointment<?php echo $dd['order_id'] ?>" style="display: none;">																<div class="arrow"></div>																<table class="form-horizontal" cellspacing="0">																	<tbody>																	<tr>																		<td>																			<textarea class="form-control" id="reason_cancel<?php echo $dd['order_id'] ?>" name="" placeholder="<?php echo $label_language_values['booking_cancel_reason']; ?>" required="required" >
                 </textarea>																		</td>																	
@@ -428,7 +437,7 @@ if (isset($_SESSION['ct_login_user_id']))
         </div>                    
         </div>                
     <?php } } } ?>                
-<!--     <?php if (isset($_SESSION['ct_login_user_id']))
+<?php if (isset($_SESSION['ct_login_user_id']))
 	{
     $details = $objuserdetails->get_user_details();
     if($details->num_rows > 0){
@@ -475,7 +484,7 @@ if (isset($_SESSION['ct_login_user_id']))
 						        } ?>                                                        
 						        <input class="exp_cp_date form-control" id="expiry_date<?php if(isset($dd['order_id'])){ echo $dd['order_id']; }else{ } ?>" data-staffid="<?php echo $staff_id; ?>" value=	"<?php echo $dates; ?>" data-date-format="yyyy/mm/dd" data-provide="datepicker" />                                                                                                                
 						         </div>                                                       
-						         <div class="cta-col6 ct-w-50 float-right mytime_slots_booking">                                                                    
+						         <div class="cta-col6 ct-w-50 float-right mytime_slots_booking" data-order="<?php if(isset($dd['order_id'])){ echo $dd['order_id']; }else{ } ?>">
 		<?php $t_zone_value = $setting->get_option('ct_timezone');
         $server_timezone = date_default_timezone_get();
         if (isset($t_zone_value) && $t_zone_value != '')
@@ -505,11 +514,13 @@ if (isset($_SESSION['ct_login_user_id']))
         $ct_service_padding_time_before = $setting->get_option('ct_service_padding_time_before');
         $ct_service_padding_time_after = $setting->get_option('ct_service_padding_time_after');
         $booking_padding_time = $setting->get_option('ct_booking_padding_time');
-        $time_schedule = $first_step->get_day_time_slot_by_provider_id($time_slots_schedule_type, $start_date, $time_interval, $advance_bookingtime, $ct_service_padding_time_before, $ct_service_padding_time_after, $timezonediff, $booking_padding_time, $staff_id);
+        $reschedule = "No";
+        $client_order_id = 0;
+        $time_schedule = $first_step->get_day_time_slot_by_provider_id($time_slots_schedule_type, $start_date, $time_interval, $staff_id, $client_order_id, $reschedule, $advance_bookingtime, $ct_service_padding_time_before, $ct_service_padding_time_after, $timezonediff, $booking_padding_time);
         $allbreak_counter = 0;
         $allofftime_counter = 0;
         $slot_counter = 0; ?>                                                                    
-		<select class="selectpicker mydatepicker_appointment   form-control" id="myuser_reschedule_time" data-size="10" style="" >                                                                        
+		<select class="selectpicker mydatepicker_appointment form-control myuser_reschedule_time" id="myuser_reschedule_time<?php if(isset($dd['order_id'])){ echo $dd['order_id']; }else{ } ?>" data-order="<?php if(isset($dd['order_id'])){ echo $dd['order_id']; }else{ } ?>" data-size="10" style="" >                                                                        
 		<?php if ($time_schedule['off_day'] != true && isset($time_schedule['slots']) && sizeof((array)$time_schedule['slots']) > 0 && $allbreak_counter != sizeof((array)$time_schedule['slots']) && $allofftime_counter != sizeof((array)$time_schedule['slots']))
         {
             foreach ($time_schedule['slots'] as $slot)
@@ -615,49 +626,29 @@ if (isset($_SESSION['ct_login_user_id']))
         </div>                                                            
         </td>                                                       
         </tr>                                                        
-        <?php $userinfo = $objuserdetails->get_user_notes($dd['order_id']);
-        $temppp = unserialize(base64_decode($userinfo[0]));
-        $tem = str_replace('\\', '', $temppp);
-        $finalnotes = $tem['notes']; ?>                                                        
-        <tr>                                                            
-        	<td><?php echo $label_language_values['notes']; ?></td>                                                            
-        	<td><textarea class="form-control my_user_notes_reschedule<?php if(isset($dd['order_id'])){ echo $dd['order_id']; }else{ } ?>"><?php echo $finalnotes; ?></textarea></td>                                                        
-        	</tr>                                                        
-        	</tbody>                                                    
-        	</table>                                                
-        	</div>                                            
-        	</div>                                        
-        	</div>                                        
-        	<div class="modal-footer">                                            
-        		<div class="cta-col12 ct-footer-popup-btn" style="width: 0%;padding: 5px;">                                                
-        			<div class="cta-col6">													<button type="button" data-order="<?php if(isset($dd['order_id'])){ echo $dd['order_id']; }else{ } ?>" class="btn btn-info my_user_btn_for_reschedule" data-gc_event="<?php echo $dd['gc_event_id']; ?>" data-gc_staff_event="<?php echo $dd['gc_staff_event_id']; ?>" data-pid="<?php echo $dd['staff_ids']; ?>"><?php echo $label_language_values['update_appointment']; ?></button>                                                
+        <tr>
+        	<td>Reason</td>
+        	<td><textarea class="form-control my_user_notes_reschedule<?php if(isset($dd['order_id'])){ echo $dd['order_id']; }else{ } ?>" placeholder="Reason for reschedule"></textarea></td>
+        	</tr>
+        	</tbody>
+        	</table>
+        	</div>
+        	</div>
+        	</div>
+        	<div class="modal-footer">
+        		<div class="cta-col12 ct-footer-popup-btn" style="width: 0%;padding: 5px;">
+        			<div class="cta-col6"><button type="button" data-order="<?php if(isset($dd['order_id'])){ echo $dd['order_id']; }else{ } ?>" class="btn btn-info my_user_btn_for_reschedule" data-gc_event="<?php echo $dd['gc_event_id']; ?>" data-gc_staff_event="<?php echo $dd['gc_staff_event_id']; ?>" data-pid="<?php echo $dd['staff_ids']; ?>">Submit request</button>                                                
         				</div>                                            
         			</div>                                        
         		</div>                                    
         	</div>                                
         </div>                            
       </div>                        
-   </div> <?php } } } ?>  -->       
+   </div> <?php } } } ?>
    </div>        
  </form>    
  </div>
 </div>
-<div id="edit_booking" class="modal fade">   
-  <div class="modal-dialog modal-lg">     
-    <div class="modal-content">                   
-      <div class="modal-header">          
-        <button type="button" id="info_modal_close" class="close" data-dismiss="modal" aria-hidden="true"><i class="fa fa-times" aria-hidden="true"></i></button>         
-        <h4 class="modal-title"><?php echo "Edit Booking";?></h4>        
-      </div>        
-      <div class="modal-body ct-edit-booking-modal-body">          
-
-      </div>        
-      <div class="modal-footer cb">         
-        <button type="button" class="btn btn-warning" data-dismiss="modal"><?php echo $label_language_values['cancel'];?></button>       
-      </div>      
-    </div>    
-  </div>  
-</div>																						 
 <?php if ($gc_hook->gc_purchase_status() == 'exist')
 {
     if ($setting->get_option('ct_gc_status_configure') == 'Y' && $setting->get_option('ct_gc_status') == 'Y')

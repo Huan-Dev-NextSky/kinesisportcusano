@@ -117,6 +117,151 @@ else
 /*new file include*/
 include(dirname(dirname(dirname(__FILE__))).'/assets/lib/date_translate_array.php');
 
+if(isset($_POST['admin_approve_cancel'])){
+	if (!isset($_SESSION['ct_adminid'])) {
+		echo "unauthorized";
+		exit;
+	}
+	$order_id = (int)$_POST['order_id'];
+	$now = date('Y-m-d H:i:s');
+
+	$bkRes = mysqli_query($conn, "SELECT `gc_event_id`, `gc_staff_event_id`, `staff_ids`, `reject_reason`, `cancel_reason`, `change_request_status`, `client_id` FROM `ct_bookings` WHERE `order_id` = {$order_id} LIMIT 1");
+	$bkRow = $bkRes ? mysqli_fetch_assoc($bkRes) : null;
+	if (!$bkRow || $bkRow['change_request_status'] !== 'CANCEL_REQUESTED') {
+		echo "invalid_request";
+		exit;
+	}
+	$cancel_reason = '';
+	$gc_event_id = '';
+	$gc_staff_event_id = '';
+	$pid = '';
+	if ($bkRow) {
+		$cancel_reason = !empty($bkRow['cancel_reason']) ? $bkRow['cancel_reason'] : (isset($bkRow['reject_reason']) ? $bkRow['reject_reason'] : '');
+		$gc_event_id = isset($bkRow['gc_event_id']) ? $bkRow['gc_event_id'] : '';
+		$gc_staff_event_id = isset($bkRow['gc_staff_event_id']) ? $bkRow['gc_staff_event_id'] : '';
+		$pid = isset($bkRow['staff_ids']) ? $bkRow['staff_ids'] : '';
+		$_POST['gc_event_id'] = $gc_event_id;
+		$_POST['gc_staff_event_id'] = $gc_staff_event_id;
+		$_POST['pid'] = $pid;
+	}
+
+	$reasonEsc = mysqli_real_escape_string($conn, $cancel_reason);
+	mysqli_query($conn, "UPDATE `ct_bookings` SET `booking_status` = 'CC', `reject_reason` = '{$reasonEsc}', `change_request_status` = 'APPROVED', `kinesis_sync_status` = 'CANCEL_PENDING', `lastmodify` = '{$now}' WHERE `order_id` = {$order_id}");
+	mysqli_query($conn, "UPDATE `ct_gcal_kinesis_sync` SET `sync_status` = 'CANCEL_PENDING', `sync_action` = 'CANCEL', `updated_at` = '{$now}' WHERE `local_order_id` = {$order_id}");
+
+	/* Cancel on Google Calendar only after admin approval */
+	if ($gc_hook->gc_purchase_status() == 'exist') {
+		if ($setting->get_option('ct_gc_status_configure') == 'Y' && $setting->get_option('ct_gc_status') == 'Y') {
+			@$gc_hook->gc_cancel_reject_booking_hook();
+		}
+	}
+	
+	if ($setting->get_option('kinesis_api_status') === 'Y') {
+		require_once dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwAppointmentSync.php';
+		$apptSync = new AwwAppointmentSync($conn);
+		$apptSync->syncSingleBooking($order_id);
+	}
+
+	$oci = @mysqli_query($conn, "SELECT `client_email`, `client_name` FROM `ct_order_client_info` WHERE `order_id` = {$order_id} LIMIT 1");
+	if ($oci && ($ociRow = mysqli_fetch_assoc($oci)) && !empty($ociRow['client_email'])) {
+		$subj = "Cancellation approved - Order #{$order_id}";
+		$body = "Hello " . $ociRow['client_name'] . ",\n\nYour cancellation request for order #{$order_id} has been approved.\n\nThank you.";
+		$headers = "From: " . $setting->get_option('ct_email_sender_address') . "\r\nContent-Type: text/plain; charset=UTF-8\r\n";
+		@mail($ociRow['client_email'], $subj, $body, $headers);
+	}
+	echo "success";
+	exit;
+}
+
+if(isset($_POST['admin_approve_reschedule'])){
+	if (!isset($_SESSION['ct_adminid'])) {
+		echo "unauthorized";
+		exit;
+	}
+	$order_id = (int)$_POST['order_id'];
+	$now = date('Y-m-d H:i:s');
+
+	$bkRes = mysqli_query($conn, "SELECT `gc_event_id`, `gc_staff_event_id`, `staff_ids`, `booking_date_time`, `change_request_status`, `reschedule_requested_date` FROM `ct_bookings` WHERE `order_id` = {$order_id} LIMIT 1");
+	$bkRow = $bkRes ? mysqli_fetch_assoc($bkRes) : null;
+	if (!$bkRow || $bkRow['change_request_status'] !== 'RESCHEDULE_REQUESTED' || empty($bkRow['reschedule_requested_date'])) {
+		echo "invalid_request";
+		exit;
+	}
+	$newDateRaw = $bkRow['reschedule_requested_date'];
+	$newDate = mysqli_real_escape_string($conn, $newDateRaw);
+	global $dates, $timess, $order_duration;
+	$order_duration = 30;
+	$durRes = mysqli_query($conn, "SELECT s.`duration` FROM `ct_bookings` b LEFT JOIN `ct_services` s ON b.`service_id` = s.`id` WHERE b.`order_id` = {$order_id} LIMIT 1");
+	if ($durRes && ($durRow = mysqli_fetch_assoc($durRes)) && !empty($durRow['duration'])) {
+		$dur = trim($durRow['duration']);
+		if (preg_match('/^(\d+):(\d+)(?::(\d+))?$/', $dur, $dm)) {
+			$order_duration = ((int)$dm[1]) * 60 + (int)$dm[2];
+		} elseif (is_numeric($dur)) {
+			$order_duration = (int)$dur;
+		}
+		if ($order_duration <= 0) { $order_duration = 30; }
+	}
+	if ($bkRow) {
+		$_POST['gc_event_id'] = isset($bkRow['gc_event_id']) ? $bkRow['gc_event_id'] : '';
+		$_POST['gc_staff_event_id'] = isset($bkRow['gc_staff_event_id']) ? $bkRow['gc_staff_event_id'] : '';
+		$_POST['pid'] = isset($bkRow['staff_ids']) ? $bkRow['staff_ids'] : '';
+	}
+	$dates = date('Y-m-d', strtotime($newDateRaw));
+	$timess = date('H:i:s', strtotime($newDateRaw));
+
+	mysqli_query($conn, "UPDATE `ct_bookings` SET `booking_date_time` = '{$newDate}', `booking_status` = 'RS', `change_request_status` = 'APPROVED', `kinesis_sync_status` = 'UPDATE_PENDING', `lastmodify` = '{$now}' WHERE `order_id` = {$order_id}");
+	mysqli_query($conn, "UPDATE `ct_gcal_kinesis_sync` SET `event_start` = '{$newDate}', `sync_status` = 'PENDING', `sync_action` = 'UPDATE', `updated_at` = '{$now}' WHERE `local_order_id` = {$order_id}");
+
+	/* Update Google Calendar only after admin approval */
+	if ($gc_hook->gc_purchase_status() == 'exist') {
+		if ($setting->get_option('ct_gc_status_configure') == 'Y' && $setting->get_option('ct_gc_status') == 'Y') {
+			@$gc_hook->gc_reschedule_booking_ajax_hook();
+		}
+	}
+	
+	if ($setting->get_option('kinesis_api_status') === 'Y') {
+		require_once dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwAppointmentSync.php';
+		$apptSync = new AwwAppointmentSync($conn);
+		$apptSync->syncSingleBooking($order_id);
+	}
+
+	$oci = @mysqli_query($conn, "SELECT `client_email`, `client_name` FROM `ct_order_client_info` WHERE `order_id` = {$order_id} LIMIT 1");
+	if ($oci && ($ociRow = mysqli_fetch_assoc($oci)) && !empty($ociRow['client_email'])) {
+		$subj = "Reschedule approved - Order #{$order_id}";
+		$body = "Hello " . $ociRow['client_name'] . ",\n\nYour reschedule request for order #{$order_id} has been approved.\nNew date/time: {$newDateRaw}\n\nThank you.";
+		$headers = "From: " . $setting->get_option('ct_email_sender_address') . "\r\nContent-Type: text/plain; charset=UTF-8\r\n";
+		@mail($ociRow['client_email'], $subj, $body, $headers);
+	}
+	echo "success";
+	exit;
+}
+
+if(isset($_POST['admin_reject_request'])){
+	if (!isset($_SESSION['ct_adminid'])) {
+		echo "unauthorized";
+		exit;
+	}
+	$order_id = (int)$_POST['order_id'];
+	$now = date('Y-m-d H:i:s');
+	$bkRes = mysqli_query($conn, "SELECT `change_request_status` FROM `ct_bookings` WHERE `order_id` = {$order_id} LIMIT 1");
+	$bkRow = $bkRes ? mysqli_fetch_assoc($bkRes) : null;
+	if (!$bkRow || ($bkRow['change_request_status'] !== 'CANCEL_REQUESTED' && $bkRow['change_request_status'] !== 'RESCHEDULE_REQUESTED')) {
+		echo "invalid_request";
+		exit;
+	}
+	mysqli_query($conn, "UPDATE `ct_bookings` SET `change_request_status` = 'REJECTED', `lastmodify` = '{$now}' WHERE `order_id` = {$order_id}");
+
+	$oci = @mysqli_query($conn, "SELECT `client_email`, `client_name` FROM `ct_order_client_info` WHERE `order_id` = {$order_id} LIMIT 1");
+	if ($oci && ($ociRow = mysqli_fetch_assoc($oci)) && !empty($ociRow['client_email'])) {
+		$subj = "Request dismissed - Order #{$order_id}";
+		$body = "Hello " . $ociRow['client_name'] . ",\n\nYour cancel/reschedule request for order #{$order_id} was dismissed by the administrator. Your booking remains unchanged.\n\nThank you.";
+		$headers = "From: " . $setting->get_option('ct_email_sender_address') . "\r\nContent-Type: text/plain; charset=UTF-8\r\n";
+		@mail($ociRow['client_email'], $subj, $body, $headers);
+	}
+	echo "success";
+	exit;
+}
+
 if(isset($_SESSION['staff_id_cal']) && $_SESSION['staff_id_cal']!=""){
 	$staff_id = $_SESSION['staff_id_cal'];
 }else{

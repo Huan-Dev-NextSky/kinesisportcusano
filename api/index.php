@@ -1,4 +1,5 @@
 <?php  
+require_once(dirname(dirname(__FILE__)).'/assets/lib/ct_sms_opt_in.php');
 include "includes.php";
 if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 	verifyRequiredParams(array("api_key", "postal_code"));
@@ -640,7 +641,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 		setResponse($invalid);
 	}
 }elseif(isset($_POST["action"]) && $_POST["action"] == "reschedule_appointment") {
-	verifyRequiredParams(array("api_key", "order_id", "notes", "date", "time"));
+	verifyRequiredParams(array("api_key", "order_id", "notes", "date", "time", "user_id"));
 	if (isset($_POST["api_key"]) && $_POST["api_key"] == $objsettings->get_option("ct_api_key")) {
 		$id = $order = $_POST["order_id"];
 		$notes = $_POST["notes"];
@@ -650,20 +651,21 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 		$read_status = "U";
 		$lastmodify = date("Y-m-d H:i:s");
 		$datetime_withmaxtime = "";
+		if ($objsettings->get_option("ct_allow_customer_reschedule") === "N") {
+			$invalid = ["status" => "false", "statuscode" => 403, "response" => "Customer reschedule is disabled"];
+			setResponse($invalid);
+			exit;
+		}
+		ct_api_guard_customer_booking_change($conn, $objdashboard, $objsettings, $first_step, $order, 'reschedule');
 		if ($getmaximumbooking != "") {
 			$datetime_withmaxtime = strtotime("+".$getmaximumbooking." month", strtotime(date("Y-m-d")));
 		}
 		if (strtotime($dates) <= $datetime_withmaxtime || $datetime_withmaxtime == "") {
 			$dat = $dates." ".$timess;
 			$finaldate = date("Y-m-d H:i:s", strtotime($dat));
-			$objuserdetails->reschedule_booking($finaldate, $order, $booking_status, $read_status, $lastmodify);
-			$serializedData = $objuserdetails->get_user_notes($order);
-			$data = unserialize(base64_decode($serializedData[0]));
-			if (array_key_exists("notes", $data)) {
-				$data["notes"] = $notes;
-			}
-			$serializedData = base64_encode(serialize($data));
-			$objuserdetails->update_notes($order, $serializedData); /* code for email and sms */
+			/* Phase 4: customer reschedule is a request — Root Admin must approve */
+			$objuserdetails->request_reschedule_booking($order, $finaldate, $notes, $lastmodify);
+			/* Customer may only change date/time — do not rewrite booking detail notes */
 			$orderdetail = $objdashboard->getclientorder_api($id);
 			$clientdetail = $objdashboard->clientemailsender($id);
 			$admin_company_name = $objsettings->get_option("ct_company_name");
@@ -825,13 +827,13 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 			}
 			$searcharray = array("{{service_name}}", "{{booking_date}}", "{{business_logo}}", "{{business_logo_alt}}", "{{client_name}}", "{{methodname}}", "{{units}}", "{{addons}}", "{{client_email}}", "{{phone}}", "{{payment_method}}", "{{vaccum_cleaner_status}}", "{{parking_status}}", "{{notes}}", "{{contact_status}}", "{{address}}", "{{price}}", "{{admin_name}}", "{{firstname}}", "{{lastname}}", "{{app_remain_time}}", "{{reject_status}}", "{{company_name}}", "{{booking_time}}", "{{client_city}}", "{{client_state}}", "{{client_zip}}", "{{company_city}}", "{{company_state}}", "{{company_zip}}", "{{company_country}}", "{{company_phone}}", "{{company_email}}", "{{company_address}}", "{{admin_name}}");
 			$replacearray = array($service_name, $booking_date, $business_logo, $business_logo_alt, $client_name, $methodname, $units, $addons, $client_email, $client_phone, $payment_status, $final_vc_status, $final_p_status, $client_notes, $client_status, $client_address, $price, $get_admin_name, $firstname, $lastname, "", "", $admin_company_name, $booking_time, $client_city, $client_state, $client_zip, $company_city, $company_state, $company_zip, $company_country, $company_phone, $company_email, $company_address, $get_admin_name);
-			if ($gc_hook->gc_purchase_status() == "exist") {
+			if (false && $gc_hook->gc_purchase_status() == "exist") {
 				if ($_POST["gc_event_id"] != "none" && $_POST["gc_staff_event_id"] != "none" && $_POST["pid"] != "none") {
 					if ($objsettings->get_option("ct_gc_status_configure") == "Y" && $objsettings->get_option("ct_gc_status") == "Y") {
 						echo $gc_hook->gc_reschedule_booking_ajax_hook();
 					}
 				}
-			} /* Client Email Template */
+			} /* GCal update deferred until admin approval — Client Email Template */
 			$emailtemplate->email_subject = "Appointment Rescheduled by you";
 			$emailtemplate->user_type = "C";
 			$clientemailtemplate = $emailtemplate->readone_client_email_template_body();
@@ -840,9 +842,10 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 			} else {
 				$clienttemplate = base64_decode($clientemailtemplate[3]);
 			}
-			$subject = $clientemailtemplate[1];
+			$subject = "Reschedule request received (pending approval) - Order #".$order;
 			if ($objsettings->get_option("ct_client_email_notification_status") == "Y" && $clientemailtemplate[4] == "E") {
 				$client_email_body = str_replace($searcharray, $replacearray, $clienttemplate);
+				$client_email_body = '<p><strong>This is a RESCHEDULE REQUEST pending Root Admin approval. Your appointment date/time has NOT been changed yet.</strong></p>' . $client_email_body;
 				if ($objsettings->get_option("ct_smtp_hostname") != "" && $objsettings->get_option("ct_email_sender_name") != "" && $objsettings->get_option("ct_email_sender_address") != "" && $objsettings->get_option("ct_smtp_username") != "" && $objsettings->get_option("ct_smtp_password") != "" && $objsettings->get_option("ct_smtp_port") != "") {
 					$mail->IsSMTP();
 				} else {
@@ -866,7 +869,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 
 				$headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
 
-				mail($get_staff_email, $subject, $client_email_body, $headers);
+				mail($client_email, $subject, $client_email_body, $headers);
 
 			}
 			} /* Admin Email Template */
@@ -878,9 +881,10 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 			} else {
 				$admintemplate = base64_decode($adminemailtemplate[3]);
 			}
-			$adminsubject = $adminemailtemplate[1];
+			$adminsubject = "Reschedule REQUEST pending approval - Order #".$order;
 			if ($objsettings->get_option("ct_admin_email_notification_status") == "Y" && $adminemailtemplate[4] == "E") {
 				$admin_email_body = str_replace($searcharray, $replacearray, $admintemplate);
+				$admin_email_body = '<p><strong>Customer RESCHEDULE REQUEST pending your approval. Appointment date/time has NOT been changed yet.</strong></p>' . $admin_email_body;
 				if ($objsettings->get_option("ct_smtp_hostname") != "" && $objsettings->get_option("ct_email_sender_name") != "" && $objsettings->get_option("ct_email_sender_address") != "" && $objsettings->get_option("ct_smtp_username") != "" && $objsettings->get_option("ct_smtp_password") != "" && $objsettings->get_option("ct_smtp_port") != "") {
 					$mail_a->IsSMTP();
 				} else {
@@ -904,14 +908,16 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 
 				$headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
 
-				mail($get_staff_email, $subject, $admin_email_body, $headers);
+				mail($admin_email, $adminsubject, $admin_email_body, $headers);
 
 			}
-			} /*SMS SENDING CODE*/ /*GET APPROVED SMS TEMPLATE*/ 
+			} /*SMS SENDING CODE — skip for pending reschedule request*/
+			if (false) {
+			/*GET APPROVED SMS TEMPLATE*/ 
 			
 			/* MESSAGEBIRD CODE */
 		if($settings->get_option("ct_sms_messagebird_status") == "Y"){
-			if ($settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
 				$template = $objdashboard->gettemplate_sms("RS", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E"){
@@ -970,14 +976,14 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 	  }
 			/* TEXTLOCAL CODE */
 			if ($objsettings->get_option("ct_sms_textlocal_status") == "Y") {
-				if ($objsettings->get_option("ct_sms_textlocal_send_sms_to_client_status") == "Y") {
+				if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_textlocal_send_sms_to_client_status") == "Y") {
 					$template = $objdashboard->gettemplate_sms("RS", "C");
 					$phone = $client_phone;
 					if ($template[4] == "E") {
 						if ($template[2] == "") {
 							$message = base64_decode($template[3]);
 						} else {
-							$message = bas64_decode($template[2]);
+							$message = base64_decode($template[2]);
 						}
 					}
 					$message = str_replace($searcharray, $replacearray, $message);
@@ -1010,10 +1016,10 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 				}
 			} /*PLIVO CODE*/
 			if ($objsettings->get_option("ct_sms_plivo_status") == "Y") {
-				if ($objsettings->get_option("ct_sms_plivo_send_sms_to_client_status") == "Y") {
+				if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_plivo_send_sms_to_client_status") == "Y") {
 					$auth_id = $objsettings->get_option("ct_sms_plivo_account_SID");
 					$auth_token = $objsettings->get_option("ct_sms_plivo_auth_token");
-					$p_client = new Plivo\ RestAPI($auth_id, $auth_token, "", "");
+					$p_client = new Plivo\RestAPI($auth_id, $auth_token, "", "");
 					$template = $objdashboard->gettemplate_sms("RS", "C");
 					$phone = $client_phone;
 					if ($template[4] == "E") {
@@ -1030,7 +1036,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 				if ($objsettings->get_option("ct_sms_plivo_send_sms_to_admin_status") == "Y") {
 					$auth_id = $objsettings->get_option("ct_sms_plivo_account_SID");
 					$auth_token = $objsettings->get_option("ct_sms_plivo_auth_token");
-					$p_admin = new Plivo\ RestAPI($auth_id, $auth_token, "", "");
+					$p_admin = new Plivo\RestAPI($auth_id, $auth_token, "", "");
 					$template = $objdashboard->gettemplate_sms("RS", "A");
 					$phone = $admin_phone_plivo;
 					if ($template[4] == "E") {
@@ -1046,7 +1052,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 				}
 			}
 			if ($objsettings->get_option("ct_sms_twilio_status") == "Y") {
-				if ($objsettings->get_option("ct_sms_twilio_send_sms_to_client_status") == "Y") {
+				if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_twilio_send_sms_to_client_status") == "Y") {
 					$AccountSid = $objsettings->get_option("ct_sms_twilio_account_SID");
 					$AuthToken = $objsettings->get_option("ct_sms_twilio_auth_token");
 					$twilliosms_client = new Services_Twilio($AccountSid, $AuthToken);
@@ -1080,7 +1086,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 				}
 			}
 			if ($objsettings->get_option("ct_nexmo_status") == "Y") {
-				if ($objsettings->get_option("ct_sms_nexmo_send_sms_to_client_status") == "Y") {
+				if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_nexmo_send_sms_to_client_status") == "Y") {
 					$template = $objdashboard->gettemplate_sms("RS", "C");
 					$phone = $client_phone;
 					if ($template[4] == "E") {
@@ -1106,9 +1112,10 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 						$res = $nexmo_admin->send_nexmo_sms($phone, $ct_nexmo_text);
 					}
 				}
-			} /*SMS SENDING CODE END*/ /* code for email and sms */
-			send_staff_email_sms($id,"RS");
-			$valid = ["status" => "true", "statuscode" => 200, "response" => $label_language_values["your_appointment_rescheduled_successfully"]];
+			} /*SMS SENDING CODE END*/
+			} /* end skip SMS for pending reschedule */
+			/* skip staff SMS/email for pending reschedule request */
+			$valid = ["status" => "true", "statuscode" => 200, "response" => "Reschedule request submitted. Waiting for admin approval."];
 			setResponse($valid);
 		} else {
 				$invalid = ["status" => "false", "statuscode" => 404, "response" => $label_language_values["sorry_we_are_not_available"]];
@@ -1119,7 +1126,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 		setResponse($invalid);
 	}
 }elseif(isset($_POST["action"]) && $_POST["action"] == "cancel_appointment") {
-	verifyRequiredParams(array("api_key", "order_id", "cancel_reason"));
+	verifyRequiredParams(array("api_key", "order_id", "cancel_reason", "user_id"));
 	if (isset($_POST["api_key"]) && $_POST["api_key"] == $objsettings->get_option("ct_api_key")) {
 		$id = $order = $_POST["order_id"];
 		$gc_event_id = $_POST["gc_event_id"];
@@ -1127,14 +1134,16 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 		$pid = $_POST["pid"];
 		$lastmodify = date("Y-m-d H:i:s");
 		$cancel_reson_book = $_POST["cancel_reason"];
-		$objuserdetails->update_booking_of_user($order, $cancel_reson_book, $lastmodify);
+		if ($objsettings->get_option("ct_allow_customer_cancel") === "N") {
+			$invalid = ["status" => "false", "statuscode" => 403, "response" => "Customer cancel is disabled"];
+			setResponse($invalid);
+			exit;
+		}
+		ct_api_guard_customer_booking_change($conn, $objdashboard, $objsettings, $first_step, $order, 'cancel');
+		/* Phase 4: customer cancel is a request — Root Admin must approve before apply */
+		$objuserdetails->request_cancel_booking($order, $cancel_reson_book, $lastmodify);
 		$orderdetail = $objdashboard->getclientorder_api($id);
-		$clientdetail = $objdashboard->clientemailsender($id); /* Delete in Google Calendar Start */
-		if ($gc_hook->gc_purchase_status() == "exist") {
-			if ($_POST["gc_event_id"] != "none" && $_POST["gc_staff_event_id"] != "none" && $_POST["pid"] != "none") {
-				echo $gc_hook->gc_cancel_reject_booking_hook();
-			}
-		} /* Delete in Google Calendar End */ /*$booking_date = date("Y-m-d H:i", strtotime($clientdetail["booking_date_time"]));*/
+		$clientdetail = $objdashboard->clientemailsender($id); /* Google Calendar cancel deferred until admin approval */
 		$admin_company_name = $objsettings->get_option("ct_company_name");
 		$setting_date_format = $objsettings->get_option("ct_date_picker_date_format");
 		$setting_time_format = $objsettings->get_option("ct_choose_time_format");
@@ -1302,9 +1311,10 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 		} else {
 			$clienttemplate = base64_decode($clientemailtemplate[3]);
 		}
-		$subject = $clientemailtemplate[1];
+		$subject = "Cancellation request received (pending approval) - Order #".$order;
 		if ($objsettings->get_option("ct_client_email_notification_status") == "Y" && $clientemailtemplate[4] == "E") {
 			$client_email_body = str_replace($searcharray, $replacearray, $clienttemplate);
+			$client_email_body = '<p><strong>This is a CANCELLATION REQUEST pending Root Admin approval. Your appointment has NOT been cancelled yet.</strong></p>' . $client_email_body;
 			if ($objsettings->get_option("ct_smtp_hostname") != "" && $objsettings->get_option("ct_email_sender_name") != "" && $objsettings->get_option("ct_email_sender_address") != "" && $objsettings->get_option("ct_smtp_username") != "" && $objsettings->get_option("ct_smtp_password") != "" && $objsettings->get_option("ct_smtp_port") != "") {
 				$mail->IsSMTP();
 			} else {
@@ -1328,7 +1338,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 
 				$headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
 
-				mail($get_staff_email, $subject, $client_email_body, $headers);
+				mail($client_email, $subject, $client_email_body, $headers);
 
 			}
 		} /* Admin Template */
@@ -1340,9 +1350,10 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 		} else {
 			$admintemplate = base64_decode($adminemailtemplate[3]);
 		}
-		$adminsubject = $adminemailtemplate[1];
+		$adminsubject = "Cancellation REQUEST pending approval - Order #".$order;
 		if ($objsettings->get_option("ct_admin_email_notification_status") == "Y" && $adminemailtemplate[4] == "E") {
 			$admin_email_body = str_replace($searcharray, $replacearray, $admintemplate);
+			$admin_email_body = '<p><strong>Customer CANCELLATION REQUEST pending your approval. Appointment has NOT been cancelled yet.</strong></p>' . $admin_email_body;
 			if ($objsettings->get_option("ct_smtp_hostname") != "" && $objsettings->get_option("ct_email_sender_name") != "" && $objsettings->get_option("ct_email_sender_address") != "" && $objsettings->get_option("ct_smtp_username") != "" && $objsettings->get_option("ct_smtp_password") != "" && $objsettings->get_option("ct_smtp_port") != "") {
 				$mail_a->IsSMTP();
 			} else {
@@ -1366,13 +1377,15 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 
 				$headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
 
-				mail($get_staff_email, $subject, $admin_email_body, $headers);
+				mail($admin_email, $adminsubject, $admin_email_body, $headers);
 
 			}
-		} /*SMS SENDING CODE*/ /*GET APPROVED SMS TEMPLATE*/ 
+		} /*SMS SENDING CODE — skip for pending cancel request*/
+		if (false) {
+		/*GET APPROVED SMS TEMPLATE*/ 
 			/* MESSAGEBIRD CODE */
 		if($settings->get_option("ct_sms_messagebird_status") == "Y"){
-			if ($settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
 				$template = $objdashboard->gettemplate_sms("CC", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E"){
@@ -1429,7 +1442,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 	  }
 		/* TEXTLOCAL CODE */
 		if ($objsettings->get_option("ct_sms_textlocal_status") == "Y") {
-			if ($objsettings->get_option("ct_sms_textlocal_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_textlocal_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("CC", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E") {
@@ -1471,10 +1484,10 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 		if ($objsettings->get_option("ct_sms_plivo_status") == "Y") {
 			$auth_id = $objsettings->get_option("ct_sms_plivo_account_SID");
 			$auth_token = $objsettings->get_option("ct_sms_plivo_auth_token");
-			$p = new Plivo\ RestAPI($auth_id, $auth_token, "", "");
+			$p = new Plivo\RestAPI($auth_id, $auth_token, "", "");
 			$plivo_sender_number = $objsettings->get_option("ct_sms_plivo_sender_number");
 			$twilio_sender_number = $objsettings->get_option("ct_sms_twilio_sender_number");
-			if ($objsettings->get_option("ct_sms_plivo_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_plivo_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("CC", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E") {
@@ -1504,7 +1517,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 			}
 		}
 		if ($objsettings->get_option("ct_sms_twilio_status") == "Y") {
-			if ($objsettings->get_option("ct_sms_twilio_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_twilio_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("CC", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E") {
@@ -1532,7 +1545,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 			}
 		}
 		if ($objsettings->get_option("ct_nexmo_status") == "Y") {
-			if ($objsettings->get_option("ct_sms_nexmo_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_nexmo_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("CC", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E") {
@@ -1559,8 +1572,9 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 				}
 			}
 		} /*SMS SENDING CODE END*/
-		send_staff_email_sms($id,"CC");
-		$valid = ["status" => "true", "statuscode" => 200, "response" => $label_language_values["your_appointment_cancelled_successfully"]];
+		} /* end skip SMS for pending cancel */
+		/* skip staff SMS/email for pending cancel request */
+		$valid = ["status" => "true", "statuscode" => 200, "response" => "Cancellation request submitted. Waiting for admin approval."];
 		setResponse($valid);
 	} else {
 			$invalid = ["status" => "false", "statuscode" => 404, "response" => $label_language_values["api_key_mismatch"]];
@@ -1824,7 +1838,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 		
 			/* MESSAGEBIRD CODE */
 		if($settings->get_option("ct_sms_messagebird_status") == "Y"){
-			if ($settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
 				$template = $objdashboard->gettemplate_sms("R", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E"){
@@ -1881,7 +1895,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 	  }
 		/* TEXTLOCAL CODE */
 		if ($objsettings->get_option("ct_sms_textlocal_status") == "Y") {
-			if ($objsettings->get_option("ct_sms_textlocal_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_textlocal_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("R", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E") {
@@ -1923,10 +1937,10 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 		if ($objsettings->get_option("ct_sms_plivo_status") == "Y") {
 			$auth_id = $objsettings->get_option("ct_sms_plivo_account_SID");
 			$auth_token = $objsettings->get_option("ct_sms_plivo_auth_token");
-			$p = new Plivo\ RestAPI($auth_id, $auth_token, "", "");
+			$p = new Plivo\RestAPI($auth_id, $auth_token, "", "");
 			$plivo_sender_number = $objsettings->get_option("ct_sms_plivo_sender_number");
 			$twilio_sender_number = $objsettings->get_option("ct_sms_twilio_sender_number");
-			if ($objsettings->get_option("ct_sms_plivo_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_plivo_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("R", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E") {
@@ -1956,7 +1970,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 			}
 		}
 		if ($objsettings->get_option("ct_sms_twilio_status") == "Y") {
-			if ($objsettings->get_option("ct_sms_twilio_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_twilio_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("R", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E") {
@@ -1984,7 +1998,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 			}
 		}
 		if ($objsettings->get_option("ct_nexmo_status") == "Y") {
-			if ($objsettings->get_option("ct_sms_nexmo_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_nexmo_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("R", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E") {
@@ -2268,7 +2282,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 		
 			/* MESSAGEBIRD CODE */
 		if($settings->get_option("ct_sms_messagebird_status") == "Y"){
-			if ($settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
 				$template = $objdashboard->gettemplate_sms("C", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E"){
@@ -2325,7 +2339,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 	  }
 		/* TEXTLOCAL CODE */
 		if ($objsettings->get_option("ct_sms_textlocal_status") == "Y") {
-			if ($objsettings->get_option("ct_sms_textlocal_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_textlocal_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("C", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E") {
@@ -2367,10 +2381,10 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 		if ($objsettings->get_option("ct_sms_plivo_status") == "Y") {
 			$auth_id = $objsettings->get_option("ct_sms_plivo_account_SID");
 			$auth_token = $objsettings->get_option("ct_sms_plivo_auth_token");
-			$p = new Plivo\ RestAPI($auth_id, $auth_token, "", "");
+			$p = new Plivo\RestAPI($auth_id, $auth_token, "", "");
 			$plivo_sender_number = $objsettings->get_option("ct_sms_plivo_sender_number");
 			$twilio_sender_number = $objsettings->get_option("ct_sms_twilio_sender_number");
-			if ($objsettings->get_option("ct_sms_plivo_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_plivo_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("C", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E") {
@@ -2400,7 +2414,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 			}
 		}
 		if ($objsettings->get_option("ct_sms_twilio_status") == "Y") {
-			if ($objsettings->get_option("ct_sms_twilio_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_twilio_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("C", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E") {
@@ -2428,7 +2442,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 			}
 		}
 		if ($objsettings->get_option("ct_nexmo_status") == "Y") {
-			if ($objsettings->get_option("ct_sms_nexmo_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_nexmo_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("C", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E") {
@@ -2711,7 +2725,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 		}
 			/* MESSAGEBIRD CODE */
 		if($settings->get_option("ct_sms_messagebird_status") == "Y"){
-			if ($settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
 				$template = $objdashboard->gettemplate_sms("A", 'C');
 				$phone = $client_phone;
 				if ($template[4] == "E"){
@@ -2767,7 +2781,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 			}
 	  }
 		if ($objsettings->get_option("ct_sms_textlocal_status") == "Y") {
-			if ($objsettings->get_option("ct_sms_textlocal_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_textlocal_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("CO", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E") {
@@ -2809,10 +2823,10 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 		if ($objsettings->get_option("ct_sms_plivo_status") == "Y") {
 			$auth_id = $objsettings->get_option("ct_sms_plivo_account_SID");
 			$auth_token = $objsettings->get_option("ct_sms_plivo_auth_token");
-			$p = new Plivo\ RestAPI($auth_id, $auth_token, "", "");
+			$p = new Plivo\RestAPI($auth_id, $auth_token, "", "");
 			$plivo_sender_number = $objsettings->get_option("ct_sms_plivo_sender_number");
 			$twilio_sender_number = $objsettings->get_option("ct_sms_twilio_sender_number");
-			if ($objsettings->get_option("ct_sms_plivo_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_plivo_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("CO", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E") {
@@ -2842,7 +2856,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 			}
 		}
 		if ($objsettings->get_option("ct_sms_twilio_status") == "Y") {
-			if ($objsettings->get_option("ct_sms_twilio_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_twilio_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("CO", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E") {
@@ -2870,7 +2884,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 			}
 		}
 		if ($objsettings->get_option("ct_nexmo_status") == "Y") {
-			if ($objsettings->get_option("ct_sms_nexmo_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_nexmo_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("CO", "C");
 				$phone = $client_phone;
 				$phone = $client_phone;
@@ -3145,6 +3159,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 						var_dump($res);
 						$Balance = $MessageBird->balance->read();
 					}
+				}
 				if ($objsettings->get_option("ct_sms_textlocal_status") == "Y") {
 					if ($objsettings->get_option("ct_sms_textlocal_send_sms_to_staff_status") == "Y") {
 						$template = $objdashboard->gettemplate_sms("A", "S");
@@ -3169,7 +3184,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 				if ($objsettings->get_option("ct_sms_plivo_status") == "Y") {
 					$auth_id = $objsettings->get_option("ct_sms_plivo_account_SID");
 					$auth_token = $objsettings->get_option("ct_sms_plivo_auth_token");
-					$p = new Plivo\ RestAPI($auth_id, $auth_token, "", "");
+					$p = new Plivo\RestAPI($auth_id, $auth_token, "", "");
 					$plivo_sender_number = $objsettings->get_option("ct_sms_plivo_sender_number");
 					$twilio_sender_number = $objsettings->get_option("ct_sms_twilio_sender_number");
 					if ($objsettings->get_option("ct_sms_plivo_send_sms_to_staff_status") == "Y") {
@@ -4517,7 +4532,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "check_postal_code") {
 		$objadminprofile->fullname = ucwords($_POST["fullname"]);
 		$objadminprofile->email = $_POST["email"];
 		$objadminprofile->pass = $_POST["pass"];
-		$objadminprofile->role = "staff";
+		$objadminprofile->role = "doctor";
 		$count_exist_email = $objadminprofile->check_staff_email_existing();
 		if($count_exist_email > 0){
 			$invalid = ["status" => "false", "statuscode" => 404, "response" => $label_language_values["staff_already_exist"]];

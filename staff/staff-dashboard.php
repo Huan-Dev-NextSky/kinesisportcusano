@@ -1,7 +1,6 @@
 <?php
 include(dirname(__FILE__) . '/header-staff.php');
 include(dirname(dirname(__FILE__)) . "/objects/class_payments.php");
-include(dirname(dirname(__FILE__)) . "/admin/user_session_check.php");
 include(dirname(dirname(__FILE__)) . "/objects/class_adminprofile.php");
 include(dirname(dirname(__FILE__)) . "/objects/class_staff_commision.php");
 include(dirname(dirname(__FILE__)) . "/objects/class_order_client_info.php");
@@ -60,30 +59,47 @@ if ($time_format == "24") {
 } else {
 	$timess = "h:i A";
 }
-$staff_id = $_SESSION['ct_staffid'];
+$staff_id = isset($_SESSION['ct_staffid']) ? $_SESSION['ct_staffid'] : 0;
+if (!$staff_id) {
 ?>
+<script type="text/javascript">
+	window.location = "<?php echo SITE_URL; ?>admin/";
+</script>
+<?php
+	exit;
+}
+?>
+<script type="text/javascript">
+jQuery(function ($) {
+	$('.ct-loading-main').hide();
 
+	// Keep main nav active state in sync with Doctor dashboard pills
+	$('#cta-staff-nav a[data-toggle="pill"]').on('shown.bs.tab', function () {
+		$('#cta-staff-nav > li').removeClass('active');
+		$(this).parent('li').addClass('active');
+	});
+	$('.my-profile[data-toggle="pill"]').on('shown.bs.tab', function () {
+		$('#cta-staff-nav > li').removeClass('active');
+	});
+	$('.my-bookings[data-toggle="pill"], .my-schedule[data-toggle="pill"]').on('shown.bs.tab', function () {
+		$('#navbarCollapsetop .nav > li').removeClass('active');
+	});
+});
+</script>
 
-<div class="cta-panel-default " id="ct-staff-dashboard">
-  <div class="nav-bg-pm">
-  <div class="container">
+<style>
+/* Doctor dashboard uses admin double-header — keep content clear of fixed navs */
+#cta #ct-staff-dashboard {
+	margin-top: 10px;
+	clear: both;
+}
+#cta #ct-staff-dashboard > .panel-body {
+	padding-left: 15px;
+	padding-right: 15px;
+}
+</style>
 
-    <div class="staff-dashboard ct-left-menu col-md-12 col-sm-12 col-xs-12 col-lg-12 navbar-collapse collapse " id="navbarCollapseMain">
-    <ul class="nav nav-tab nav-stacked" id="cta-staff-nav">
-      <li class="active"><a href="#my-bookings" class="my-bookings" data-toggle="pill"><i class="fa fa-television fax24-pm"></i><br /> <?php echo $label_language_values['bookings']; ?> </a></li>
-      <li><a href="#my-schedule" class="my-schedule" data-toggle="pill"><i class="fa fa-clock-o fax24-pm"></i><br /><?php echo $label_language_values['schedule']; ?></a></li>
-      <li><a href="#my-wallet" class="my-wallet" data-toggle="pill"><i class="fa fa-money fax24-pm"></i><br /> <?php echo $label_language_values['payment']; ?> </a></li>
-      <?php
-      if ($gc_hook->gc_purchase_status() == 'exist') {
-        echo $gc_hook->gc_setting_menu_hook();
-      }
-      ?>
-      <li><a href="#my-profile" class="my-profile" data-toggle="pill"><i class="fa fa-user fax24-pm"></i><br /> <?php echo $label_language_values['profile']; ?> </a></li>
-      <li class="active1"><a id="logout" href="javascript:void(0)" data-toggle="pill"><i class="fa fa-power-off fax24-pm"></i><br /><span><?php echo $label_language_values['logout']; ?></span></a></li>
-    </ul>
-  </div>
-  </div></div>
-	
+<div class="cta-panel-default" id="ct-staff-dashboard">
 	<div class="panel-body">
 		<div class="tab-content staff-right-content col-md-12 col-sm-12 col-lg-12 col-xs-12">
 			<div class="company-details tab-pane fade in active" id="my-bookings">
@@ -92,10 +108,16 @@ $staff_id = $_SESSION['ct_staffid'];
 						<h1 class="panel-title text-left"><?php echo $label_language_values['bookings']; ?></h1>
 					</div>
 					<div class="panel-body">
-						<ul class="nav nav-tabs nav-justified ct-staff-right-menu">
-							<li class="active today_staff_appointments"><a href="#today-appointments" data-toggle="tab"><?php echo $label_language_values['today_bookings']; ?></a></li>
-							<li><a href="#future-appointments" data-toggle="tab" class="future_staff_appointments"><?php echo $label_language_values['future_bookings']; ?></a></li>
-							<li><a href="#past-appointments" data-toggle="tab" class="past_staff_appointments"><?php echo $label_language_values['past_bookings']; ?></a></li>
+						<ul class="nav nav-tabs nav-justified ct-staff-right-menu ct-segment-tabs">
+							<li class="active today_staff_appointments">
+								<a href="#today-appointments" data-toggle="tab"><i class="fa fa-sun-o"></i><?php echo $label_language_values['today_bookings']; ?></a>
+							</li>
+							<li>
+								<a href="#future-appointments" data-toggle="tab" class="future_staff_appointments"><i class="fa fa-calendar"></i><?php echo $label_language_values['future_bookings']; ?></a>
+							</li>
+							<li>
+								<a href="#past-appointments" data-toggle="tab" class="past_staff_appointments"><i class="fa fa-history"></i><?php echo $label_language_values['past_bookings']; ?></a>
+							</li>
 						</ul>
 						<div class="tab-pane active">
 							<!-- first staff nmember -->
@@ -552,12 +574,12 @@ $staff_id = $_SESSION['ct_staffid'];
 						<h1 class="panel-title text-left"><?php echo $label_language_values['schedule']; ?></h1>
 					</div>
 					<div class="panel-body mt-30">
-						<ul class="nav nav-tabs nav-justified ct-staff-right-menu">
-							<li class="active"><a href="#member-details" data-toggle="tab"><?php echo $label_language_values['view_slots_by']; ?></a></li>
-							<li><a href="#member-availabilty" class="availability" data-toggle="tab"><?php echo $label_language_values['availabilty']; ?></a></li>
-							<li><a href="#member-addbreaks" data-toggle="tab"><?php echo $label_language_values['add_breaks']; ?></a></li>
-							<li><a href="#member-offtime" data-toggle="tab" class="myoff_timeslink"><?php echo $label_language_values['off_time']; ?></a></li>
-							<li><a href="#member-offdays" data-toggle="tab"><?php echo $label_language_values['off_days']; ?></a></li>
+						<ul class="nav nav-tabs nav-justified ct-staff-right-menu ct-segment-tabs">
+							<li class="active"><a href="#member-details" data-toggle="tab"><i class="fa fa-sliders"></i><?php echo $label_language_values['view_slots_by']; ?></a></li>
+							<li><a href="#member-availabilty" class="availability" data-toggle="tab"><i class="fa fa-clock-o"></i><?php echo $label_language_values['availabilty']; ?></a></li>
+							<li><a href="#member-addbreaks" data-toggle="tab"><i class="fa fa-coffee"></i><?php echo $label_language_values['add_breaks']; ?></a></li>
+							<li><a href="#member-offtime" data-toggle="tab" class="myoff_timeslink"><i class="fa fa-ban"></i><?php echo $label_language_values['off_time']; ?></a></li>
+							<li><a href="#member-offdays" data-toggle="tab"><i class="fa fa-calendar-times-o"></i><?php echo $label_language_values['off_days']; ?></a></li>
 						</ul>
 						<div class="tab-pane active">
 							<!-- first staff nmember -->
@@ -1147,6 +1169,7 @@ $staff_id = $_SESSION['ct_staffid'];
 					</div>
 				</div>
 			</div>
+			<?php if (false) { /* Payment tab hidden for Doctor role */ ?>
 			<div class="tab-pane fade" id="my-wallet">
 				<div class="panel panel-default">
 					<div class="panel-heading">
@@ -1224,16 +1247,15 @@ $staff_id = $_SESSION['ct_staffid'];
 					</div>
 				</div>
 			</div>
+			<?php } ?>
 
 			<?php
-			if ($gc_hook->gc_purchase_status() == 'exist') {
-				echo $gc_hook->gc_staff_settings_menu_content_hook();
-			}
+			/* Payment and Google Calendar Settings removed from Doctor dashboard */
 			?>
 			<div class="company-details tab-pane fade" id="my-profile">
 				<div class="panel panel-default">
 					<div class="panel-heading">
-						<h1 class="panel-title text-left"><?php echo $label_language_values['staff'] . " " . $label_language_values['profile']; ?></h1>
+						<h1 class="panel-title text-left">Doctor Profile</h1>
 					</div>
 					<div class="mt-30">
 						<div class="container-fluid npl npr">
@@ -1542,19 +1564,6 @@ $staff_id = $_SESSION['ct_staffid'];
 	</div>
 </div>
 <?php
-if ($gc_hook->gc_purchase_status() == 'exist') {
-	echo $gc_hook->gc_staff_settings_save_js_hook();
-}
-if ($gc_hook->gc_purchase_status() == 'exist') {
-	echo $gc_hook->gc_staff_setting_configure_js_hook();
-}
-if ($gc_hook->gc_purchase_status() == 'exist') {
-	echo $gc_hook->gc_staff_setting_disconnect_js_hook();
-}
-if ($gc_hook->gc_purchase_status() == 'exist') {
-	echo $gc_hook->gc_staff_setting_verify_js_hook();
-}
-
 include(dirname(dirname(__FILE__)) . '/admin/footer.php');
 ?>
 <script type="text/javascript">

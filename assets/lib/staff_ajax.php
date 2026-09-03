@@ -260,7 +260,18 @@ if (isset($_POST['u_member_email'])) {
 	$objadmin->email = $_POST['email'];
 	$objadmin->fullname = ucwords($_POST['name']);
 	$objadmin->pass = $_POST['pass'];
-	$objadmin->role = $_POST['role'];
+	$objadmin->role = isset($_POST['role']) ? $_POST['role'] : 'doctor';
+	$objadmin->external_employee_id = isset($_POST['external_employee_id']) && $_POST['external_employee_id'] !== '' ? (int)$_POST['external_employee_id'] : null;
+
+	if (!empty($objadmin->external_employee_id)) {
+		$dupQ = mysqli_query($conn, "SELECT `id`, `fullname` FROM `ct_admin_info` WHERE `role` != 'admin' AND `external_employee_id` = " . (int)$objadmin->external_employee_id . " LIMIT 1");
+		if ($dupQ && mysqli_num_rows($dupQ) > 0) {
+			$dupRow = mysqli_fetch_assoc($dupQ);
+			echo "duplicate_kinesis_employee:" . (isset($dupRow['fullname']) ? $dupRow['fullname'] : '');
+			exit;
+		}
+	}
+
 	$staff_register = $objadmin->add_staff();
 
 	if ($staff_register) {
@@ -326,13 +337,18 @@ if (isset($_POST['u_member_email'])) {
 	$objadmin->state = $_POST['state'];
 	$objadmin->zip = $_POST['zip'];
 	$objadmin->country = $_POST['country'];
-	$objadmin->latitude = $_POST['latitude'];
-	$objadmin->longitude = $_POST['longitude'];
-	$objadmin->APIUsername = $_POST['APIUsername'];
-	$objadmin->APIPassword = $_POST['APIPassword'];
-	$objadmin->APISignature = $_POST['APISignature'];
-	$objadmin->APItestmode = $_POST['APItestmode'];
+	$objadmin->latitude = isset($_POST['latitude']) ? $_POST['latitude'] : '';
+	$objadmin->longitude = isset($_POST['longitude']) ? $_POST['longitude'] : '';
+	$objadmin->APIUsername = isset($_POST['APIUsername']) ? $_POST['APIUsername'] : '';
+	$objadmin->APIPassword = isset($_POST['APIPassword']) ? $_POST['APIPassword'] : '';
+	$objadmin->APISignature = isset($_POST['APISignature']) ? $_POST['APISignature'] : '';
+	$objadmin->APItestmode = isset($_POST['APItestmode']) ? $_POST['APItestmode'] : '';
 	$objadmin->image = $_POST['staff_image'];
+	$objadmin->role = isset($_POST['role']) ? $_POST['role'] : 'doctor';
+	// Kinesis Employee ID is fixed after create — keep existing mapping
+	$currMapQ = mysqli_query($conn, "SELECT `external_employee_id` FROM `ct_admin_info` WHERE `id` = " . (int)$objadmin->id . " LIMIT 1");
+	$currMapRow = $currMapQ ? mysqli_fetch_assoc($currMapQ) : null;
+	$objadmin->external_employee_id = ($currMapRow && !empty($currMapRow['external_employee_id'])) ? (int)$currMapRow['external_employee_id'] : null;
 
 	if ($_POST['ct_service_staff'] != '') {
 		$new_service = implode(",", $_POST['ct_service_staff']);
@@ -372,6 +388,32 @@ if (isset($_POST['u_member_email'])) {
 	$objadmin->id = $_POST['staff_id'];
 	$staff_id = $_POST['staff_id'];
 	$staff_read = $objadmin->readone();
+
+	$currExtId = isset($staff_read['external_employee_id']) ? $staff_read['external_employee_id'] : '';
+	$currExtLabel = '';
+	if ($currExtId !== '' && $currExtId !== null && (int)$currExtId > 0) {
+		$currExtLabel = 'ID: ' . $currExtId . ' (Current Mapped)';
+		if ($settings->get_option('kinesis_api_status') === 'Y') {
+			require_once dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwApiClient.php';
+			$awwClient = new AwwApiClient($conn);
+			$empRes = $awwClient->getAllEmployees();
+			if ($empRes['success'] && !empty($empRes['data'])) {
+				foreach ($empRes['data'] as $kEmp) {
+					$kId = isset($kEmp['id']) ? $kEmp['id'] : (isset($kEmp['Id']) ? $kEmp['Id'] : '');
+					if ((string)$kId !== (string)$currExtId) {
+						continue;
+					}
+					$kName = isset($kEmp['name']) ? $kEmp['name'] : (isset($kEmp['fullName']) ? $kEmp['fullName'] : (isset($kEmp['firstName']) ? ($kEmp['firstName'] . ' ' . (isset($kEmp['lastName']) ? $kEmp['lastName'] : '')) : 'Employee #' . $kId));
+					$kEmail = isset($kEmp['email']) ? $kEmp['email'] : (isset($kEmp['Email']) ? $kEmp['Email'] : '');
+					$currExtLabel = 'ID: ' . $kId . ' - ' . $kName . ($kEmail ? ' (' . $kEmail . ')' : '');
+					break;
+				}
+			}
+		}
+	} else {
+		$currExtLabel = 'None / Local Only';
+		$currExtId = '';
+	}
 	?>
 
 	<link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/star_rating.min.css" type="text/css" media="all">
@@ -426,12 +468,12 @@ if (isset($_POST['u_member_email'])) {
 
 		</div>
 		<hr id="hr" />
-		<ul class="nav nav-tabs nav-justified ct-staff-right-menu">
+		<ul class="nav nav-tabs nav-justified ct-staff-right-menu ct-segment-tabs">
 			<li class="active"><a href="#member-details"
-					data-toggle="tab"><?php echo $label_language_values['staff_details']; ?></a></li>
+					data-toggle="tab"><i class="fa fa-user-md"></i>Doctor Details</a></li>
 			<li><a href="#member-service-details"
-					data-toggle="tab"><?php echo $label_language_values['service_details']; ?></a></li>
-			<li><a href="#member-availability-details" data-toggle="tab">Staff Availability</a></li>
+					data-toggle="tab"><i class="fa fa-tasks"></i><?php echo $label_language_values['service_details']; ?></a></li>
+			<li><a href="#member-availability-details" data-toggle="tab"><i class="fa fa-clock-o"></i>Doctor Availability</a></li>
 		</ul>
 		<div class="tab-pane active">
 			<!-- first staff nmember -->
@@ -599,6 +641,16 @@ if (isset($_POST['u_member_email'])) {
 											name="u_member_email" /></div>
 								</div>
 
+								<input type="hidden" id="ct-member-role" name="ct-member-role" value="doctor" />
+								<div class="form-group col-xs-12 col-md-12">
+									<div class="col-xs-4 col-md-2"><label for="ct-member-ext-id">Kinesis Employee (API)</label></div>
+									<div class="col-xs-8 col-md-10">
+										<input type="hidden" id="ct-member-ext-id" name="ct-member-ext-id" value="<?php echo htmlspecialchars((string)$currExtId); ?>" />
+										<input type="text" class="form-control" value="<?php echo htmlspecialchars($currExtLabel); ?>" readonly disabled style="background:#f5f5f5; cursor:not-allowed;" />
+										<small class="text-muted" style="display:block; margin-top:4px;">Mapped at creation — cannot be changed</small>
+									</div>
+								</div>
+
 								<div class="form-group col-xs-12 col-md-12">
 									<div class="col-xs-4 col-md-2"><label
 											for="ct-member-desc"><?php echo $label_language_values['description']; ?></label>
@@ -761,7 +813,7 @@ if (isset($_POST['u_member_email'])) {
 								<thead>
 									<th>#</th>
 									<th><?php echo $label_language_values['client']; ?></th>
-									<th><?php echo $label_language_values['staff_name']; ?></th>
+									<th>Doctor Name</th>
 									<th><?php echo $label_language_values['service_name']; ?></th>
 									<th><?php echo $label_language_values['order_date']; ?></th>
 									<th><?php echo $label_language_values['order_time']; ?></th>
@@ -814,15 +866,15 @@ if (isset($_POST['u_member_email'])) {
 
 					<div class="panel panel-default">
 
-						<ul class="nav nav-tabs nav-justified ct-staff-right-menu">
+						<ul class="nav nav-tabs nav-justified ct-staff-right-menu ct-segment-tabs">
 							<li class="active"><a href="#member-availabilty" class="availability"
-									data-toggle="tab"><?php echo $label_language_values['availabilty']; ?></a></li>
+									data-toggle="tab"><i class="fa fa-clock-o"></i><?php echo $label_language_values['availabilty']; ?></a></li>
 							<li><a href="#member-addbreaks"
-									data-toggle="tab"><?php echo $label_language_values['add_breaks']; ?></a></li>
+									data-toggle="tab"><i class="fa fa-coffee"></i><?php echo $label_language_values['add_breaks']; ?></a></li>
 							<li><a href="#member-offtime" data-toggle="tab"
-									class="myoff_timeslink"><?php echo $label_language_values['off_time']; ?></a></li>
+									class="myoff_timeslink"><i class="fa fa-ban"></i><?php echo $label_language_values['off_time']; ?></a></li>
 							<li><a href="#member-offdays"
-									data-toggle="tab"><?php echo $label_language_values['off_days']; ?></a></li>
+									data-toggle="tab"><i class="fa fa-calendar-times-o"></i><?php echo $label_language_values['off_days']; ?></a></li>
 						</ul>
 						<div class="tab-pane active">
 							<!-- first staff nmember -->
@@ -1680,7 +1732,7 @@ if (isset($_POST['get_staff_bookingandpayment_by_dateser'])) {
 				<th><?php echo $label_language_values['app_date']; ?></th>
 				<th><?php echo $label_language_values['customer']; ?></th>
 				<th><?php echo $label_language_values['status']; ?></th>
-				<th><?php echo $label_language_values['staff_name']; ?></th>
+				<th>Doctor Name</th>
 				<th><?php echo $label_language_values['net_total']; ?></th>
 				<th><?php echo $label_language_values['commission_total']; ?></th>
 				<th><?php echo $label_language_values['action']; ?></th>
@@ -1704,7 +1756,7 @@ if (isset($_POST['get_staff_bookingandpayment_by_dateser'])) {
 					} elseif ($all['booking_status'] == 'CC') {
 						$status = 'Cancelled By Client';
 					} elseif ($all['booking_status'] == 'CS') {
-						$status = 'Cancelled By Staff';
+						$status = 'Cancelled By Doctor';
 					} elseif ($all['booking_status'] == 'CO') {
 						$status = 'Completed';
 					} elseif ($all['booking_status'] == 'MN') {
@@ -1725,7 +1777,7 @@ if (isset($_POST['get_staff_bookingandpayment_by_dateser'])) {
 						<td><?php echo $general->ct_price_format($get_booking_nettotal, $symbol_position, $decimal); ?></td>
 						<td><a href="#add-staff-payment" role="button" class="btn btn-success show_staff_payment_details"
 								data-toggle="modal" data-order_id="<?php echo $all['order_id']; ?>"
-								data-staff_ids="<?php echo $all['staff_ids']; ?>"><?php echo $label_language_values['staff_payment']; ?></a>
+								data-staff_ids="<?php echo $all['staff_ids']; ?>">Doctor Payment</a>
 						</td>
 					</tr>
 					<?php
@@ -1748,7 +1800,7 @@ if (isset($_POST['get_payment_staff_by_date'])) {
 			<tr>
 				<th>#</th>
 				<th><?php echo $label_language_values['client']; ?></th>
-				<th><?php echo $label_language_values['staff_name']; ?></th>
+				<th>Doctor Name</th>
 				<th><?php echo $label_language_values['payment_method']; ?></th>
 				<th><?php echo $label_language_values['payment_date']; ?></th>
 				<th><?php echo $label_language_values['amount']; ?></th>

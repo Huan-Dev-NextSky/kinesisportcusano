@@ -75,7 +75,10 @@ class cleanto_dashboard{
         }
         /* reject the order/bookings */
         public function reject_bookings($orderid,$reason,$lastmodify){
-            $query="update `ct_bookings` set `booking_status`='R',`reject_reason`='".$reason."',`lastmodify` = '".$lastmodify."' where `order_id`='".$orderid."'";
+            $orderEsc = (int)$orderid;
+            $reasonEsc = mysqli_real_escape_string($this->conn, $reason);
+            $lastEsc = mysqli_real_escape_string($this->conn, $lastmodify);
+            $query="update `ct_bookings` set `booking_status`='R',`reject_reason`='".$reasonEsc."',`lastmodify` = '".$lastEsc."', `kinesis_sync_status` = IF(`kinesis_appointment_id` IS NOT NULL AND `kinesis_appointment_id` > 0, 'CANCEL_PENDING', `kinesis_sync_status`) where `order_id`='".$orderEsc."'";
             $result=mysqli_query($this->conn,$query);
             return $result;
         }

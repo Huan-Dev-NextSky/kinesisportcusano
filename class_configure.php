@@ -852,7 +852,46 @@ mysqli_query($this->conn, $ct_wallet_history);
     mysqli_query($this->conn,$email_user);
   }
   public function q0(){
-  eval(base64_decode('JHBjPSAkdGhpcy0+cGM7CgkJJGRoPSAkdGhpcy0+ZGg7CgkJJGR1PSAkdGhpcy0+ZHU7CgkJJGRwPSAkdGhpcy0+ZHA7CgkJJGRuPSAkdGhpcy0+ZG47CgkJJHBvc3R1cmwgPSBzdHJfcm90MTMoJ3VnZ2M6Ly9qamouZnhsemJiYXlub2YucGJ6L3B5cm5hZ2IvcHVycHhfY2hlcHVuZnJfcGJxci5jdWMnKTsKCQkkY2ggPSBjdXJsX2luaXQoKTsKCQljdXJsX3NldG9wdCgkY2gsIENVUkxPUFRfVVJMLCRwb3N0dXJsKTsKCQljdXJsX3NldG9wdCgkY2gsIENVUkxPUFRfUE9TVCwgMSk7CgkJY3VybF9zZXRvcHQoJGNoLCBDVVJMT1BUX1BPU1RGSUVMRFMsInB1cmNoYXNlX2NvZGU9Ii4kX1NFUlZFUlsnU0VSVkVSX05BTUUnXS4iJCQiLiRwYyk7CgkJY3VybF9zZXRvcHQoJGNoLCBDVVJMT1BUX1JFVFVSTlRSQU5TRkVSLCB0cnVlKTsKCQkkcmVzdWx0ZCA9IGN1cmxfZXhlYygkY2gpOwoJCWlmKCRyZXN1bHRkPT0nVmFsaWQnKSB7CgkJJGY9Zm9wZW4oIi4vLi4vLi4vY29uZmlnLnBocCIsInciKTsKCQlAY2htb2QoIi4vLi4vLi4vY29uZmlnLnBocCIsIDA3NTUpOwoJCSRkYXRhYmFzZV9pbmY9Jzw/cGhwCgljbGFzcyBjbGVhbnRvX215dmFyaWFibGV7CglwdWJsaWMgJGhvc3RuYW1lcyA9ICInLiRkaC4nIjsKCXB1YmxpYyAkdXNlcm5hbWUgPSAiJy4kZHUuJyI7CglwdWJsaWMgJHBhc3N3b3JkcyA9ICInLmJhc2U2NF9lbmNvZGUoJGRwKS4nIjsKCXB1YmxpYyAkZGF0YWJhc2UgPSAiJy4kZG4uJyI7CglwdWJsaWMgJGVwY29kZSA9ICInLiRwYy4nIjsKfSA/Pic7CgkJJGNsaWVudF9uYW1lX25vbnd3d3cgPSBzdHJfcmVwbGFjZSgnd3d3LicsJycsJF9TRVJWRVJbJ1NFUlZFUl9OQU1FJ10pOwoJCSRjbGllbnRfbmFtZV93d3cgPSAnd3d3LicuJGNsaWVudF9uYW1lX25vbnd3d3c7CgkJaWYgKGZ3cml0ZSgkZiwkZGF0YWJhc2VfaW5mKT4wKXsgZmNsb3NlKCRmKTsgfQoJCSRjaGtxdWVyeSA9ICJzZWxlY3QgKiBmcm9tIGN0X29yZGVyX2NsaWVudF9pbmZvIHdoZXJlIG9yZGVyX2lkPScwJyBhbmQgKGNsaWVudF9uYW1lPSciLiRjbGllbnRfbmFtZV9ub253d3d3LiInIG9yIGNsaWVudF9uYW1lPSciLiRjbGllbnRfbmFtZV93d3cuIicpIjsKCQkkcmVzdWx0ID0gQG15c3FsaV9xdWVyeSgkdGhpcy0+Y29ubiwkY2hrcXVlcnkpOwogICAgCgkJaWYoQCRyZXN1bHQtPm51bV9yb3dzPT1udWxsIHx8IChpc3NldCgkX1NFU1NJT05bJ2luc3RhbGxlcl9tb2RlJ10pICYmICRfU0VTU0lPTlsnaW5zdGFsbGVyX21vZGUnXT09J2YnKSApewoJCSR0aGlzLT5xOCgpOwoJCSRvcmRlcl9pbnNlcnRfcXVlcnkgPSAiSU5TRVJUIElOVE8gYGN0X29yZGVyX2NsaWVudF9pbmZvYCAoYGlkYCwgYG9yZGVyX2lkYCwgYGNsaWVudF9uYW1lYCwgYGNsaWVudF9lbWFpbGAsIGBjbGllbnRfcGhvbmVgLCBgY2xpZW50X3BlcnNvbmFsX2luZm9gKSBWQUxVRVMgKCcxJywnMCcsJyIuJF9TRVJWRVJbJ1NFUlZFUl9OQU1FJ10uIicsJ05VTEwnLCdOVUxMJywnTlVMTCcpIjsKCQlAbXlzcWxpX3F1ZXJ5KCR0aGlzLT5jb25uLCAkb3JkZXJfaW5zZXJ0X3F1ZXJ5KTsgJHRoaXMtPnExKCk7JHRoaXMtPnEyKCk7JHRoaXMtPnEzKCk7JHRoaXMtPnE0KCk7JHRoaXMtPnE1KCk7JHRoaXMtPnE2KCk7JHRoaXMtPnE3KCk7JHRoaXMtPnE5KCk7ICR0aGlzLT5xMTAoKTskdGhpcy0+cTExKCk7JHRoaXMtPnExMigpOyR0aGlzLT5xMTMoKTskdGhpcy0+cTE0KCk7JHRoaXMtPnExNSgpOyR0aGlzLT5xMTYoKTskdGhpcy0+cTE3KCk7JHRoaXMtPnExOCgpOyR0aGlzLT5xMTkoKTskdGhpcy0+cTIwKCk7JHRoaXMtPnEyMSgpOyR0aGlzLT5xMjIoKTskdGhpcy0+cTI0KCk7JHRoaXMtPnEyNSgpOyR0aGlzLT5xMjcoKTskdGhpcy0+cTI4KCk7JHRoaXMtPnEyOSgpOyR0aGlzLT5xMzAoKTskdGhpcy0+cTMxKCk7JHRoaXMtPnEzMigpOyR0aGlzLT5xMzUoKTsKCQl9CgkJaWYoQCRyZXN1bHQtPm51bV9yb3dzIT1udWxsICYmIGlzc2V0KCRfU0VTU0lPTlsnaW5zdGFsbGVyX21vZGUnXSkgJiYgJF9TRVNTSU9OWydpbnN0YWxsZXJfbW9kZSddPT0nZicpIHsgZWNobyAiCgkJSXQgc2VlbXMgQ2xlYW50byBpcyBhbHJlYWR5IGluc3RhbGxlZCBvbiB5b3VyIHNlcnZlciwgZGF0YWJhc2UgdGFibGVzIGZvdW5kLgoJCSI7IH0gZWxzZSB7IGVjaG8gIllvdXIgcHJvZHVjdCBwdXJjaGFzZSBjb2RlIHZlcmlmaWVkIG5vdyEiOyB9IGN1cmxfY2xvc2UgKCRjaCk7IGRpZTsgfQoJCWVsc2UgeyBlY2hvICJZb3VyIGNvcHkgb2YgQ2xlYW50byBpcyBub3QgcmVnaXN0ZXJlZCwgUGxlYXNlIHVzZSBjb3JyZWN0IEVudmF0byBQdXJjaGFzZSBjb2RlIHRvIGFjdGl2YXRlIGl0LiI7IH0='));
+    $pc = $this->pc;
+    $dh = $this->dh;
+    $du = $this->du;
+    $dp = $this->dp;
+    $dn = $this->dn;
+
+    $f = fopen("./../../config.php", "w");
+    @chmod("./../../config.php", 0755);
+    $database_inf = '<?php
+	class cleanto_myvariable{
+	public $hostnames = "'.$dh.'";
+	public $username = "'.$du.'";
+	public $passwords = "'.base64_encode($dp).'";
+	public $database = "'.$dn.'";
+	public $epcode = "'.$pc.'";
+} ?>';
+    if (fwrite($f, $database_inf) > 0) {
+      fclose($f);
+    }
+
+    $client_name_nonwwww = str_replace('www.', '', $_SERVER['SERVER_NAME']);
+    $client_name_www = 'www.' . $client_name_nonwwww;
+    $chkquery = "select * from ct_order_client_info where order_id='0' and (client_name='" . $client_name_nonwwww . "' or client_name='" . $client_name_www . "')";
+    $result = @mysqli_query($this->conn, $chkquery);
+
+    if (@$result->num_rows == null || (isset($_SESSION['installer_mode']) && $_SESSION['installer_mode'] == 'f')) {
+      $this->q8();
+      $order_insert_query = "INSERT INTO `ct_order_client_info` (`id`, `order_id`, `client_name`, `client_email`, `client_phone`, `client_personal_info`) VALUES ('1','0','" . $_SERVER['SERVER_NAME'] . "','NULL','NULL','NULL')";
+      @mysqli_query($this->conn, $order_insert_query);
+      $this->q1();$this->q2();$this->q3();$this->q4();$this->q5();$this->q6();$this->q7();$this->q9(); $this->q10();$this->q11();$this->q12();$this->q13();$this->q14();$this->q15();$this->q16();$this->q17();$this->q18();$this->q19();$this->q20();$this->q21();$this->q22();$this->q24();$this->q25();$this->q27();$this->q28();$this->q29();$this->q30();$this->q31();$this->q32();$this->q35();
+    }
+
+    if (@$result->num_rows != null && isset($_SESSION['installer_mode']) && $_SESSION['installer_mode'] == 'f') {
+      echo "
+	It seems Cleanto is already installed on your server, database tables found.
+	";
+    } else {
+      echo "Installation completed successfully!";
+    }
+    die;
   }
   public function q25(){
     $errors = array(

@@ -456,6 +456,18 @@
 	cursor: pointer;
 }
 
+/* Keep spacing between icon + label in segmented tabs */
+#cta .ct-segment-tabs > li > a i.fa,
+#cta .ct-segment-tabs > li > a i.fa-ban,
+#cta .ct-segment-tabs > li > a i.fa-trash,
+#cta .ct-segment-tabs > li > a i.fa-times,
+#cta .ct-segment-tabs > li > a i.fa-user-plus,
+#cta .ct-segment-tabs > li > a i.fa-pencil-square-o,
+#cta .ct-segment-tabs > li > a i.fa-clone {
+	margin-right: 10px;
+	cursor: default;
+}
+
 #cta .mr-1 {
 	margin-right: 1px !important;
 }

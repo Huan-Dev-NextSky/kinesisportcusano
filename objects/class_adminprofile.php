@@ -26,6 +26,8 @@ class cleanto_adminprofile {
     public $APISignature;
     public $APItestmode;
 	public $ct_service_staff;
+	public $external_employee_id;
+	public $image;
 	public $otp;
 	public $phone1;
 	public $tablename="ct_admin_info";
@@ -84,16 +86,18 @@ class cleanto_adminprofile {
 		$value=mysqli_fetch_array($result);
 		return $value;
 	}
-	/* Function for add staff */
+	/* Function for add staff / doctor */
 	public function add_staff(){
-		 $query="insert into `".$this->tablename."` (`id`, `password`, `email`, `fullname`, `phone`, `address`, `city`, `state`, `zip`, `country`,`role`, `description`, `enable_booking`, `service_commission`, `commision_value`, `schedule_type`, `image`, `service_ids`) values(NULL,'".md5($this->pass)."','".$this->email."','".$this->fullname."','', '', '', '', '', '', '".$this->role."', '', 'N', 'F', '0', 'W', '', '')";
+		$role = !empty($this->role) ? mysqli_real_escape_string($this->conn, $this->role) : 'doctor';
+		$extId = !empty($this->external_employee_id) ? (int)$this->external_employee_id : 'NULL';
+		$query = "insert into `".$this->tablename."` (`id`, `password`, `email`, `fullname`, `phone`, `address`, `city`, `state`, `zip`, `country`,`role`, `external_employee_id`, `description`, `enable_booking`, `service_commission`, `commision_value`, `schedule_type`, `image`, `service_ids`) values(NULL,'".md5($this->pass)."','".mysqli_real_escape_string($this->conn, $this->email)."','".mysqli_real_escape_string($this->conn, $this->fullname)."','', '', '', '', '', '', '".$role."', ".$extId.", '', 'Y', 'F', '0', 'W', '', '')";
 		$result=mysqli_query($this->conn,$query);	
 		$value=mysqli_insert_id($this->conn);
 		return $value;
 	}
-	/* Function for count staff */
+	/* Function for count staff / doctor */
 	public function countall_staff(){
-		$query="select count(`id`) as `c_sid` from `".$this->tablename."` where `role` = 'staff'";
+		$query="select count(`id`) as `c_sid` from `".$this->tablename."` where `role` != 'admin'";
 		$result=mysqli_query($this->conn,$query);	
 		$value = mysqli_fetch_array($result);
 		return $value= isset($value[0])? $value[0] : '' ;
@@ -101,22 +105,24 @@ class cleanto_adminprofile {
 	
 	/*  display all staff in staff page in admin pane  */
 	public function readall_staff(){
-		$query = "select * from `".$this->tablename."` where `role` = 'staff'";
+		$query = "select * from `".$this->tablename."` where `role` != 'admin'";
 		$result = mysqli_query($this->conn,$query);
 		return $result;
 	}
 	/*  display all staff available for booking  */
 	public function readall_staff_booking(){
-		$query  = "select * from `".$this->tablename."` where `role` = 'staff' and `enable_booking` = 'Y'";
+		$query  = "select * from `".$this->tablename."` where `role` != 'admin' and `enable_booking` = 'Y'";
 		$result=mysqli_query($this->conn,$query);
 		return $result;
 	}
 
 	/* staff details update*/
 	public function update_staff_details(){
-	$query="update `".$this->tablename."` set `fullname`='".$this->fullname."' ,`email`='".$this->email."' ,`description`='".$this->description."' ,`phone`='".$this->phone."' ,`address`='".$this->address."' ,`city`='".$this->city."' ,`state`='".$this->state."' ,`zip`='".$this->zip."' ,`country`='".$this->country."' ,`enable_booking`='".$this->enable_booking."' ,`image`='".$this->image."'  ,`service_ids`='".$this->ct_service_staff."',`paypal_api_username`='".$this->APIUsername."',`paypal_api_password`='".$this->APIPassword."',`paypal_api_signature`='".$this->APISignature."',`paypal_test_mode_status`='".$this->APItestmode."',`latitude`='".$this->latitude."',`longitude`='".$this->longitude."' where `id`='".$this->id."' ";
+		$extIdSql = !empty($this->external_employee_id) ? "`external_employee_id`=" . (int)$this->external_employee_id . "," : "`external_employee_id`=NULL,";
+		$roleSql = !empty($this->role) ? "`role`='" . mysqli_real_escape_string($this->conn, $this->role) . "'," : "";
+		$query="update `".$this->tablename."` set `fullname`='".$this->fullname."' ,`email`='".$this->email."' , {$roleSql} {$extIdSql} `description`='".$this->description."' ,`phone`='".$this->phone."' ,`address`='".$this->address."' ,`city`='".$this->city."' ,`state`='".$this->state."' ,`zip`='".$this->zip."' ,`country`='".$this->country."' ,`enable_booking`='".$this->enable_booking."' ,`image`='".$this->image."'  ,`service_ids`='".$this->ct_service_staff."',`paypal_api_username`='".$this->APIUsername."',`paypal_api_password`='".$this->APIPassword."',`paypal_api_signature`='".$this->APISignature."',`paypal_test_mode_status`='".$this->APItestmode."',`latitude`='".$this->latitude."',`longitude`='".$this->longitude."' where `id`='".$this->id."' ";
 		$result=mysqli_query($this->conn,$query);
-    return $result;
+		return $result;
 	}
 	/* delete staff */
 	public function delete_staff(){
@@ -195,7 +201,8 @@ class cleanto_adminprofile {
 
   /* Function for reg staff */
   public function reg_staff(){
-    $query="insert into `".$this->tablename."` (`id`, `password`, `email`, `fullname`, `phone`, `address`, `city`, `state`, `zip`, `country`,`role`, `description`, `enable_booking`, `service_commission`, `commision_value`, `schedule_type`, `image`, `service_ids`) values(NULL,'".md5($this->pass)."','".$this->email."','".$this->fullname."','', '', '', '', '', '', 'staff', '', 'N', 'F', '0', 'W', '', '".$this->service."')";
+    $roleIns = !empty($this->role) ? mysqli_real_escape_string($this->conn, $this->role) : 'doctor';
+    $query="insert into `".$this->tablename."` (`id`, `password`, `email`, `fullname`, `phone`, `address`, `city`, `state`, `zip`, `country`,`role`, `description`, `enable_booking`, `service_commission`, `commision_value`, `schedule_type`, `image`, `service_ids`) values(NULL,'".md5($this->pass)."','".$this->email."','".$this->fullname."','', '', '', '', '', '', '".$roleIns."', '', 'N', 'F', '0', 'W', '', '".$this->service."')";
     $result=mysqli_query($this->conn,$query); 
     $value=mysqli_insert_id($this->conn);
     return $value;
@@ -271,8 +278,8 @@ class cleanto_adminprofile {
   } 
   /*  display all staff available for reschedule booking */
 	public function readall_staff_for_reschedule($service_id){
-		$query  = "select * from `".$this->tablename."` where `role` = 'staff' and `enable_booking` = 'Y' and `service_ids` like '%".$service_id."%'";
-		/*$query  = "select * from `".$this->tablename."` where tech_status!=1 and `role` = 'staff' and `enable_booking` = 'Y' and `zone` = '".$zone."' and `service_ids` like '%".$service_id."%'";*/
+		$query  = "select * from `".$this->tablename."` where `role` = 'doctor' and `enable_booking` = 'Y' and `service_ids` like '%".$service_id."%'";
+		/*$query  = "select * from `".$this->tablename."` where tech_status!=1 and `role` = 'doctor' and `enable_booking` = 'Y' and `zone` = '".$zone."' and `service_ids` like '%".$service_id."%'";*/
 		$result=mysqli_query($this->conn,$query);
 		return $result;
 	}	

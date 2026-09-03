@@ -1,7 +1,8 @@
 <?php
+require_once(dirname(dirname(__FILE__)).'/assets/lib/ct_sms_opt_in.php');
 include "includes.php";
 if(isset($_POST["action"]) && $_POST["action"] == "cancel_appointment") {
-	verifyRequiredParams(array("api_key", "order_id", "cancel_reason"));
+	verifyRequiredParams(array("api_key", "order_id", "cancel_reason", "user_id"));
 	if (isset($_POST["api_key"]) && $_POST["api_key"] == $objsettings->get_option("ct_api_key")) {
 		$id = $order = $_POST["order_id"];
 		if(isset($_POST["gc_event_id"]) && isset($_POST["gc_staff_event_id"]) && isset($_POST["pid"])){
@@ -11,14 +12,16 @@ if(isset($_POST["action"]) && $_POST["action"] == "cancel_appointment") {
 		}
 		$lastmodify = date("Y-m-d H:i:s");
 		$cancel_reson_book = $_POST["cancel_reason"];
-		$objuserdetails->update_booking_of_user($order, $cancel_reson_book, $lastmodify);
+		if ($objsettings->get_option("ct_allow_customer_cancel") === "N") {
+			$invalid = ["status" => "false", "statuscode" => 403, "response" => "Customer cancel is disabled"];
+			setResponse($invalid);
+			exit;
+		}
+		ct_api_guard_customer_booking_change($conn, $objdashboard, $objsettings, $first_step, $order, 'cancel');
+		/* Phase 4: customer cancel is a request — Root Admin must approve before apply */
+		$objuserdetails->request_cancel_booking($order, $cancel_reson_book, $lastmodify);
 		$orderdetail = $objdashboard->getclientorder_api($id);
-		$clientdetail = $objdashboard->clientemailsender($id); /* Delete in Google Calendar Start */
-		if ($gc_hook->gc_purchase_status() == "exist") {
-			if ($_POST["gc_event_id"] != "none" && $_POST["gc_staff_event_id"] != "none" && $_POST["pid"] != "none") {
-				echo $gc_hook->gc_cancel_reject_booking_hook();
-			}
-		} /* Delete in Google Calendar End */ /*$booking_date = date("Y-m-d H:i", strtotime($clientdetail["booking_date_time"]));*/
+		$clientdetail = $objdashboard->clientemailsender($id); /* Google Calendar cancel deferred until admin approval */
 		$admin_company_name = $objsettings->get_option("ct_company_name");
 		$setting_date_format = $objsettings->get_option("ct_date_picker_date_format");
 		$setting_time_format = $objsettings->get_option("ct_choose_time_format");
@@ -186,9 +189,10 @@ if(isset($_POST["action"]) && $_POST["action"] == "cancel_appointment") {
 		} else {
 			$clienttemplate = base64_decode($clientemailtemplate[3]);
 		}
-		$subject = $clientemailtemplate[1];
+		$subject = "Cancellation request received (pending approval) - Order #".$order;
 		if ($objsettings->get_option("ct_client_email_notification_status") == "Y" && $clientemailtemplate[4] == "E") {
 			$client_email_body = str_replace($searcharray, $replacearray, $clienttemplate);
+			$client_email_body = '<p><strong>This is a CANCELLATION REQUEST pending Root Admin approval. Your appointment has NOT been cancelled yet.</strong></p>' . $client_email_body;
 			if ($objsettings->get_option("ct_smtp_hostname") != "" && $objsettings->get_option("ct_email_sender_name") != "" && $objsettings->get_option("ct_email_sender_address") != "" && $objsettings->get_option("ct_smtp_username") != "" && $objsettings->get_option("ct_smtp_password") != "" && $objsettings->get_option("ct_smtp_port") != "") {
 				$mail->IsSMTP();
 			} else {
@@ -211,7 +215,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "cancel_appointment") {
 
 				$headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
 
-				mail($get_staff_email, $subject, $client_email_body, $headers);
+				mail($client_email, $subject, $client_email_body, $headers);
 
 			}
 		} /* Admin Template */
@@ -223,9 +227,10 @@ if(isset($_POST["action"]) && $_POST["action"] == "cancel_appointment") {
 		} else {
 			$admintemplate = base64_decode($adminemailtemplate[3]);
 		}
-		$adminsubject = $adminemailtemplate[1];
+		$adminsubject = "Cancellation REQUEST pending approval - Order #".$order;
 		if ($objsettings->get_option("ct_admin_email_notification_status") == "Y" && $adminemailtemplate[4] == "E") {
 			$admin_email_body = str_replace($searcharray, $replacearray, $admintemplate);
+			$admin_email_body = '<p><strong>Customer CANCELLATION REQUEST pending your approval. Appointment has NOT been cancelled yet.</strong></p>' . $admin_email_body;
 			if ($objsettings->get_option("ct_smtp_hostname") != "" && $objsettings->get_option("ct_email_sender_name") != "" && $objsettings->get_option("ct_email_sender_address") != "" && $objsettings->get_option("ct_smtp_username") != "" && $objsettings->get_option("ct_smtp_password") != "" && $objsettings->get_option("ct_smtp_port") != "") {
 				$mail_a->IsSMTP();
 			} else {
@@ -248,13 +253,15 @@ if(isset($_POST["action"]) && $_POST["action"] == "cancel_appointment") {
 
 				$headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
 
-				mail($get_staff_email, $subject, $admin_email_body, $headers);
+				mail($admin_email, $adminsubject, $admin_email_body, $headers);
 
 			}
-		} /*SMS SENDING CODE*/ /*GET APPROVED SMS TEMPLATE*/ 
+		} /*SMS SENDING CODE — skip for pending cancel request*/
+		if (false) {
+		/*GET APPROVED SMS TEMPLATE*/ 
 			/* MESSAGEBIRD CODE */
 		if($settings->get_option("ct_sms_messagebird_status") == "Y"){
-			if ($settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
 				$template = $objdashboard->gettemplate_sms("CC", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E"){
@@ -311,7 +318,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "cancel_appointment") {
 	  }
 		/* TEXTLOCAL CODE */
 		if ($objsettings->get_option("ct_sms_textlocal_status") == "Y") {
-			if ($objsettings->get_option("ct_sms_textlocal_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_textlocal_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("CC", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E") {
@@ -353,10 +360,10 @@ if(isset($_POST["action"]) && $_POST["action"] == "cancel_appointment") {
 		if ($objsettings->get_option("ct_sms_plivo_status") == "Y") {
 			$auth_id = $objsettings->get_option("ct_sms_plivo_account_SID");
 			$auth_token = $objsettings->get_option("ct_sms_plivo_auth_token");
-			$p = new Plivo\ RestAPI($auth_id, $auth_token, "", "");
+			$p = new Plivo\RestAPI($auth_id, $auth_token, "", "");
 			$plivo_sender_number = $objsettings->get_option("ct_sms_plivo_sender_number");
 			$twilio_sender_number = $objsettings->get_option("ct_sms_twilio_sender_number");
-			if ($objsettings->get_option("ct_sms_plivo_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_plivo_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("CC", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E") {
@@ -386,7 +393,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "cancel_appointment") {
 			}
 		}
 		if ($objsettings->get_option("ct_sms_twilio_status") == "Y") {
-			if ($objsettings->get_option("ct_sms_twilio_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_twilio_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("CC", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E") {
@@ -414,7 +421,7 @@ if(isset($_POST["action"]) && $_POST["action"] == "cancel_appointment") {
 			}
 		}
 		if ($objsettings->get_option("ct_nexmo_status") == "Y") {
-			if ($objsettings->get_option("ct_sms_nexmo_send_sms_to_client_status") == "Y") {
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $objsettings->get_option("ct_sms_nexmo_send_sms_to_client_status") == "Y") {
 				$template = $objdashboard->gettemplate_sms("CC", "C");
 				$phone = $client_phone;
 				if ($template[4] == "E") {
@@ -441,8 +448,9 @@ if(isset($_POST["action"]) && $_POST["action"] == "cancel_appointment") {
 				}
 			}
 		} /*SMS SENDING CODE END*/
-		send_staff_email_sms($id,"CC",$objdashboard,$setting,$booking,$english_date_array,$selected_lang_label,$admin_email,$general);
-		$valid = ["status" => "true", "statuscode" => 200, "response" => $label_language_values["your_appointment_cancelled_successfully"]];
+		} /* end skip SMS for pending request */
+		/* skip staff SMS/email for pending cancel request */
+		$valid = ["status" => "true", "statuscode" => 200, "response" => "Cancellation request submitted. Waiting for admin approval."];
 		setResponse($valid);
 	} else {
 			$invalid = ["status" => "false", "statuscode" => 404, "response" => $label_language_values["api_key_mismatch"]];

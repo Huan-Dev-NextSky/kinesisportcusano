@@ -193,7 +193,7 @@ class cleanto_services{
 	}
 	/*  TO GET ALL IMAGES NAMES FROM SERVICE,ADDONS TABLE FOR DELETING NOT USED IN DIRECTORY */
 	public function get_used_staff_images(){
-		$query = "select `image` as `image` from `ct_admin_info` where `role`='staff'";
+		$query = "select `image` as `image` from `ct_admin_info` where `role`='doctor'";
 		$result=mysqli_query($this->conn,$query);
 		return $result;
 	}

@@ -37,6 +37,29 @@ if ($time_format == "24") {
 $symbol_position = $setting->get_option('ct_currency_symbol_position');
 $decimal = $setting->get_option('ct_price_format_decimal_places');
 $getcurrency_symbol_position = $setting->get_option('ct_currency_symbol_position');
+
+$kinesis_employees = array();
+$used_kinesis_employee_ids = array();
+$usedEmpQ = mysqli_query($conn, "SELECT `external_employee_id` FROM `ct_admin_info` WHERE `role` != 'admin' AND `external_employee_id` IS NOT NULL AND `external_employee_id` != 0");
+if ($usedEmpQ) {
+	while ($usedRow = mysqli_fetch_assoc($usedEmpQ)) {
+		$used_kinesis_employee_ids[(string)$usedRow['external_employee_id']] = true;
+	}
+}
+if ($setting->get_option('kinesis_api_status') === 'Y') {
+	require_once dirname(dirname(__FILE__)) . '/integrations/awwapi/AwwApiClient.php';
+	$awwClient = new AwwApiClient($conn);
+	$empRes = $awwClient->getAllEmployees();
+	if ($empRes['success'] && !empty($empRes['data'])) {
+		foreach ($empRes['data'] as $kEmp) {
+			$kId = isset($kEmp['id']) ? $kEmp['id'] : (isset($kEmp['Id']) ? $kEmp['Id'] : '');
+			if ($kId === '' || isset($used_kinesis_employee_ids[(string)$kId])) {
+				continue;
+			}
+			$kinesis_employees[] = $kEmp;
+		}
+	}
+}
 ?>
 <style>
 
@@ -57,23 +80,21 @@ $getcurrency_symbol_position = $setting->get_option('ct_currency_symbol_position
 <div id="cta-staff-panel" class="panel tab-content np">
 	<div class="panel panel-default">
 		<div class="panel-heading">
-			<h1 class="panel-title"><?php echo $label_language_values['staff_details_add_new_and_manage_staff_payments']; ?>
-
-			</h1>
+			<h1 class="panel-title">Doctors &amp; Specialists Management</h1>
 		</div>
 		<div class="panel-body">
-			<ul class="nav nav-tabs">
-				<li class="active"><a data-toggle="tab" href="#add-new-staff"><?php echo $label_language_values['add_staff']; ?></a></li>
-				<li><a data-toggle="tab" href="#staff-booking-payments"><?php echo $label_language_values['staff_bookings_and_payments']; ?></a></li>
+			<ul class="nav nav-tabs ct-segment-tabs">
+				<li class="active"><a data-toggle="tab" href="#add-new-staff"><i class="fa fa-user-md"></i> Doctors Management</a></li>
+				<li><a data-toggle="tab" href="#staff-booking-payments"><i class="fa fa-money"></i> Doctor Bookings &amp; Payments</a></li>
 			</ul>
 			<div class="tab-content">
 				<div id="add-new-staff" class="tab-pane fade in active">
 					<div id="accordion" class="panel-group">
 						<div class="ct-staff-list col-md-3 col-sm-4 col-xs-12 col-lg-3">
 							<div class="ct-staff-container">
-								<h3><?php echo $label_language_values['staff_members']; ?>
+								<h3>Doctors
 									<span>(<?php echo $objadmin->countall_staff(); ?>)</span>
-									<a href="#ct-add-new-staff" title="Add New Staff Member" role="button" class="btn btn-info pull-right" data-toggle="modal"><i class="fa fa-user-plus"></i> <?php echo $label_language_values['add_new']; ?></a>
+									<a href="#ct-add-new-staff" title="Add New Doctor" role="button" class="btn btn-info pull-right" data-toggle="modal"><i class="fa fa-user-plus"></i> Add New Doctor</a>
 								</h3>
 
 								<!-- end popover -->
@@ -115,7 +136,7 @@ $getcurrency_symbol_position = $setting->get_option('ct_currency_symbol_position
 				</div>
 				<div id="staff-booking-payments" class="tab-pane fade">
 					<div class="panel-body pall-15">
-						<h3><?php echo $label_language_values['staff_booking_details_and_payment']; ?>
+						<h3>Doctor Booking Details and Payment
 						</h3>
 						<div id="accordion" class="panel-group">
 							<div class="ct-calendar-top-bar">
@@ -149,7 +170,7 @@ $getcurrency_symbol_position = $setting->get_option('ct_currency_symbol_position
 											<th><?php echo $label_language_values['app_date']; ?></th>
 											<th><?php echo $label_language_values['customer'] . " " . $label_language_values['name']; ?></th>
 											<th><?php echo $label_language_values['status']; ?></th>
-											<th><?php echo $label_language_values['staff_name']; ?></th>
+											<th>Doctor Name</th>
 											<th><?php echo $label_language_values['net_total']; ?></th>
 											<th><?php echo $label_language_values['commission_total']; ?></th>
 											<th><?php echo $label_language_values['action']; ?></th>
@@ -180,7 +201,7 @@ $getcurrency_symbol_position = $setting->get_option('ct_currency_symbol_position
 											} elseif ($all['booking_status'] == 'CC') {
 												$status = 'Cancelled By Client';
 											} elseif ($all['booking_status'] == 'CS') {
-												$status = 'Cancelled By Staff';
+												$status = 'Cancelled By Doctor';
 											} elseif ($all['booking_status'] == 'CO') {
 												$status = 'Completed';
 											} elseif ($all['booking_status'] == 'MN') {
@@ -198,7 +219,7 @@ $getcurrency_symbol_position = $setting->get_option('ct_currency_symbol_position
 												<td><?php echo rtrim($staff_name); ?></td>
 												<td><?php echo  $general->ct_price_format($net_total, $symbol_position, $decimal); ?></td>
 												<td><?php echo $general->ct_price_format($get_booking_nettotal, $symbol_position, $decimal); ?></td>
-												<td><a href="#add-staff-payment" role="button" class="btn btn-success show_staff_payment_details" data-toggle="modal" data-order_id="<?php if(isset($all['order_id'])){ echo $all['order_id']; }else{ } ?>" data-staff_ids="<?php echo $all['staff_ids']; ?>"><?php echo $label_language_values['staff_payment']; ?></a></td>
+												<td><a href="#add-staff-payment" role="button" class="btn btn-success show_staff_payment_details" data-toggle="modal" data-order_id="<?php if(isset($all['order_id'])){ echo $all['order_id']; }else{ } ?>" data-staff_ids="<?php echo $all['staff_ids']; ?>">Doctor Payment</a></td>
 											</tr>
 										<?php 	} }	?>
 									</tbody>
@@ -219,34 +240,46 @@ $getcurrency_symbol_position = $setting->get_option('ct_currency_symbol_position
 		<div class="modal-content">
 			<div class="modal-header">
 				<button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
-				<h4 class="modal-title"><?php echo $label_language_values['add_new_staff_member']; ?></h4>
+				<h4 class="modal-title"><i class="fa fa-user-md"></i> Add New Doctor (Specialist)</h4>
 			</div>
 			<div class="modal-body">
 				<form id="staff_insert">
+					<input type="hidden" class="staff_role" id="staff_role" name="staff_role" value="doctor" />
 					<table class="form-horizontal" cellspacing="0" class="table-responsive">
 						<tbody>
+							<tr class="form-field">
+								<td><label for="external_employee_id">Kinesis Employee (API)</label></td>
+								<td>
+									<select class="form-control external_employee_id" id="external_employee_id" name="external_employee_id">
+										<option value="" data-name="" data-email="">-- Select Kinesis Employee (None / Local Only) --</option>
+										<?php if (!empty($kinesis_employees)) { 
+											foreach ($kinesis_employees as $kEmp) { 
+												$kId = isset($kEmp['id']) ? $kEmp['id'] : (isset($kEmp['Id']) ? $kEmp['Id'] : '');
+												$kName = isset($kEmp['name']) ? $kEmp['name'] : (isset($kEmp['fullName']) ? $kEmp['fullName'] : (isset($kEmp['firstName']) ? ($kEmp['firstName'] . ' ' . (isset($kEmp['lastName']) ? $kEmp['lastName'] : '')) : 'Employee #' . $kId));
+												$kEmail = isset($kEmp['email']) ? $kEmp['email'] : (isset($kEmp['Email']) ? $kEmp['Email'] : '');
+											?>
+												<option value="<?php echo $kId; ?>" data-name="<?php echo htmlspecialchars($kName); ?>" data-email="<?php echo htmlspecialchars($kEmail); ?>"><?php echo "ID: " . $kId . " - " . htmlspecialchars($kName) . ($kEmail ? " (" . htmlspecialchars($kEmail) . ")" : ""); ?></option>
+											<?php } 
+										} else { ?>
+												<option value="" disabled>No available Kinesis employees (all already mapped)</option>
+										<?php } ?>
+									</select>
+								</td>
+							</tr>
 							<tr class="form-field form-required">
 								<td><label for="ab-newstaff-fullname"><?php echo $label_language_values['name']; ?> <span class="error">*</span></label></td>
-								<td><input type="text" class="form-control staff_name" id="staff_name" name="staff_name" required="required" placeholder="Your Name" />
+								<td><input type="text" class="form-control staff_name" id="staff_name" name="staff_name" required="required" placeholder="Doctor Full Name" />
 								</td>
 							</tr>
 							<tr class="form-field form-required">
 								<td><label for="ab-newstaff-fullname"><?php echo $label_language_values['email']; ?> <span class="error">*</span>
 									</label></td>
-								<td><input type="email" placeholder="Your Email address" class="form-control staff_email" id="staff_email" name="staff_email" required="required" /></td>
+								<td><input type="email" placeholder="Doctor Email address" class="form-control staff_email" id="staff_email" name="staff_email" required="required" /></td>
 							</tr>
 							<tr class="form-field form-required">
 								<td><label for="staff_pass"><?php echo $label_language_values['password']; ?> <span class="error">*</span></label></td>
-								<td><input type="password" class="form-control staff_pass" placeholder="Type your password" id="staff_pass" name="staff_pass" required="required" /></td>
+								<td><input type="password" class="form-control staff_pass" placeholder="Type password" id="staff_pass" name="staff_pass" required="required" /></td>
 							</tr>
-							<!--<tr>						
-							<td><label for="member-role">Role</label></td>						
-							<td>							
-								<select class="form-control selectpicker" id="staff_role" data-width="200px" style="display: none;">					
-								<option value="staff">Staff</option>							
-								<option value="admin">Admin</option>							</select>							
-							</td>					
-						</tr>-->
 						</tbody>
 					</table>
 				</form>
@@ -265,14 +298,14 @@ $getcurrency_symbol_position = $setting->get_option('ct_currency_symbol_position
 		<div class="modal-content ">
 			<div class="modal-header">
 				<button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
-				<h4 class="modal-title"><?php echo $label_language_values['add_payment_to_staff_account']; ?></h4>
+				<h4 class="modal-title">Add Payment to Doctor account</h4>
 			</div>
 			<div class="modal-body">
 				<table id="staff-payments-adding" class="display responsive nowrap table table-striped table-bordered table-responsive" cellspacing="0" width="100%">
 					<thead>
 						<tr>
 							<th>#</th>
-							<th><?php echo $label_language_values['staff_name']; ?></th>
+							<th>Doctor Name</th>
 							<th><?php echo $label_language_values['amount_payable']; ?></th>
 							<th><?php echo $label_language_values['advance_paid']; ?></th>
 							<th><?php echo $label_language_values['net_total']; ?></th>

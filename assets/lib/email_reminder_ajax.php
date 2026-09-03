@@ -1,4 +1,5 @@
 <?php 
+require_once(dirname(__FILE__).'/ct_sms_opt_in.php');
 session_start();
 include_once(dirname(dirname(dirname(__FILE__))).'/header.php');	
 include(dirname(dirname(dirname(__FILE__))).'/objects/class_connection.php');
@@ -239,7 +240,8 @@ if($book_details->num_rows > 0){
 		
 		$orderdetail = $objdashboard->getclientorder($binfo[1]);
 		$clientdetail = $objdashboard->clientemailsender($binfo[1]);
-		
+		$order = $id = (int)$binfo[1];
+		$client_id = isset($orderdetail[3]) ? (int)$orderdetail[3] : 0;
 		$admin_company_name = $setting->get_option('ct_company_name');
 		$setting_date_format = $setting->get_option('ct_date_picker_date_format');
 		$setting_time_format = $setting->get_option('ct_time_format');
@@ -491,7 +493,7 @@ if($book_details->num_rows > 0){
 			/*GET APPROVED SMS TEMPLATE*/
 			/* MESSAGEBIRD CODE */
 			if($settings->get_option("ct_sms_messagebird_status") == "Y"){
-				if ($settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
+				if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
 					$template = $objdashboard->gettemplate_sms("RM",'C');
 					$phone = $client_phone;
 					if ($template[4] == "E"){
@@ -549,7 +551,7 @@ if($book_details->num_rows > 0){
 			/* TEXTLOCAL CODE */
 			if($setting->get_option('ct_sms_textlocal_status') == "Y")
 			{
-				if($setting->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
+				if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $setting->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
 					$template = $objdashboard->gettemplate_sms("RM",'C');
 					$phone = $client_phone;				
 					if($template[4] == "E") {
@@ -593,7 +595,7 @@ if($book_details->num_rows > 0){
 			/*PLIVO CODE*/
 			if($setting->get_option('ct_sms_plivo_status')=="Y"){
 				
-				if($setting->get_option('ct_sms_plivo_send_sms_to_client_status') == "Y"){
+				if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $setting->get_option('ct_sms_plivo_send_sms_to_client_status') == "Y"){
 					$auth_id = $setting->get_option('ct_sms_plivo_account_SID');
 					$auth_token = $setting->get_option('ct_sms_plivo_auth_token');
 					$p_client = new Plivo\RestAPI($auth_id, $auth_token, '', '');
@@ -648,7 +650,7 @@ if($book_details->num_rows > 0){
 				}
 			}
 			if($setting->get_option('ct_sms_twilio_status') == "Y"){
-				if($setting->get_option('ct_sms_twilio_send_sms_to_client_status') == "Y"){
+				if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $setting->get_option('ct_sms_twilio_send_sms_to_client_status') == "Y"){
 					$AccountSid = $setting->get_option('ct_sms_twilio_account_SID');
 					$AuthToken =  $setting->get_option('ct_sms_twilio_auth_token'); 
 					$twilliosms_client = new Services_Twilio($AccountSid, $AuthToken);
@@ -693,7 +695,7 @@ if($book_details->num_rows > 0){
 				}
 			}
 			if($setting->get_option('ct_nexmo_status') == "Y"){
-				if($setting->get_option('ct_sms_nexmo_send_sms_to_client_status') == "Y"){
+				if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $setting->get_option('ct_sms_nexmo_send_sms_to_client_status') == "Y"){
 					$template = $objdashboard->gettemplate_sms("RM",'C');
 					$phone = $client_phone;				
 					if($template[4] == "E") {
@@ -1515,7 +1517,7 @@ if($gc_hook->gc_purchase_status() == 'exist'){
 					/*GET APPROVED SMS TEMPLATE*/
 					/* MESSAGEBIRD CODE */
 		if($settings->get_option("ct_sms_messagebird_status") == "Y"){
-			if ($settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
+			if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $settings->get_option('ct_sms_messagebird_send_sms_to_client_status') == "Y"){
 				$template = $objdashboard->gettemplate_sms("RS",'C');
 				$phone = $client_phone;
 				if ($template[4] == "E"){
@@ -1576,7 +1578,7 @@ if($gc_hook->gc_purchase_status() == 'exist'){
 					/* TEXTLOCAL CODE */
 					if($setting->get_option('ct_sms_textlocal_status') == "Y")
 					{
-						if($setting->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
+						if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $setting->get_option('ct_sms_textlocal_send_sms_to_client_status') == "Y"){
 							$template = $objdashboard->gettemplate_sms("RS",'C');
 							$phone = $client_phone;				
 							if($template[4] == "E") {
@@ -1620,7 +1622,7 @@ if($gc_hook->gc_purchase_status() == 'exist'){
 					/*PLIVO CODE*/
 					if($setting->get_option('ct_sms_plivo_status')=="Y"){
 						 
-						 if($setting->get_option('ct_sms_plivo_send_sms_to_client_status') == "Y"){
+						 if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $setting->get_option('ct_sms_plivo_send_sms_to_client_status') == "Y"){
 							$auth_id = $setting->get_option('ct_sms_plivo_account_SID');
 							$auth_token = $setting->get_option('ct_sms_plivo_auth_token');
 							$p_client = new Plivo\RestAPI($auth_id, $auth_token, '', '');
@@ -1675,7 +1677,7 @@ if($gc_hook->gc_purchase_status() == 'exist'){
 						}
 					}
 					if($setting->get_option('ct_sms_twilio_status') == "Y"){
-						if($setting->get_option('ct_sms_twilio_send_sms_to_client_status') == "Y"){
+						if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $setting->get_option('ct_sms_twilio_send_sms_to_client_status') == "Y"){
 							$AccountSid = $setting->get_option('ct_sms_twilio_account_SID');
 							$AuthToken =  $setting->get_option('ct_sms_twilio_auth_token'); 
 							$twilliosms_client = new Services_Twilio($AccountSid, $AuthToken);
@@ -1720,7 +1722,7 @@ if($gc_hook->gc_purchase_status() == 'exist'){
 						}
 					}
 					if($setting->get_option('ct_nexmo_status') == "Y"){
-						if($setting->get_option('ct_sms_nexmo_send_sms_to_client_status') == "Y"){
+						if (ct_client_sms_allowed($conn, isset($client_id)?$client_id:(isset($sms_client_id)?$sms_client_id:0), isset($order)?$order:(isset($id)?$id:(isset($order_id)?$order_id:0))) && $setting->get_option('ct_sms_nexmo_send_sms_to_client_status') == "Y"){
 							$template = $objdashboard->gettemplate_sms("RS",'C');
 							$phone = $client_phone;				
 							if($template[4] == "E") {

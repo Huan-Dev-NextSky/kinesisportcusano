@@ -98,7 +98,7 @@ class cleanto_first_step
 	
 	function random_technician()
     {
-        $query = "SELECT * from ct_admin_info where role='staff'";
+        $query = "SELECT * from ct_admin_info where role='doctor'";
         $result = mysqli_query($this->conn, $query);
         if($result->num_rows > 0){
             while ($random = mysqli_fetch_array($result)) {

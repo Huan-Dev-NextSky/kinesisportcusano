@@ -79,6 +79,7 @@ $global_p_status = $setting->get_option('ct_p_status');
 						</div>				
 						<div class="modal-body">					
 							<ul class="list-unstyled ct-cal-booking-details bkng-detl">				
+							    <li class="ct-change-request-notice" style="display:none; width: 100%;"></li>
 							    <li style="width: 100%;">							
     								<label style="width: 30%; margin-right: 0;">
     									<?php  echo $label_language_values['booking_status'];?>

@@ -111,9 +111,55 @@ include(dirname(dirname(dirname(__FILE__))).'/assets/lib/date_translate_array.ph
 	$dateformat=$setting->get_option('ct_date_picker_date_format');	
 	$time_format=$setting->get_option('ct_time_format');		
 	/*Invoice Details*/
-	$order_id = $_GET['iid'];
+	$order_id = isset($_GET['iid']) ? (int)$_GET['iid'] : 0;
+	if ($order_id <= 0) {
+		header('HTTP/1.1 400 Bad Request');
+		echo 'Invalid invoice request.';
+		exit;
+	}
+
+	$payments->order_id = $order_id;
+	$payment_row = $payments->readone_payment_details();
+	if (!$payment_row) {
+		header('HTTP/1.1 404 Not Found');
+		echo 'Invoice not found.';
+		exit;
+	}
+
+	$payment_is_completed = (isset($payment_row['payment_status']) && $payment_row['payment_status'] === 'Completed');
+	$is_admin = isset($_SESSION['ct_adminid']);
+	$is_staff = isset($_SESSION['ct_staffid']);
+	$is_customer = isset($_SESSION['ct_login_user_id']) && !$is_admin;
+
+	/* Admin/staff: any invoice. Customers: Completed + own booking. Anonymous: denied. */
+	if ($is_admin || $is_staff) {
+		/* allowed */
+	} elseif ($is_customer) {
+		if (!$payment_is_completed) {
+			header('HTTP/1.1 403 Forbidden');
+			echo 'Invoice is available after payment is completed.';
+			exit;
+		}
+		$booking->order_id = $order_id;
+		$bookings_check = $booking->get_details_for_invoice_client();
+		if (!$bookings_check || (int)$bookings_check[4] !== (int)$_SESSION['ct_login_user_id']) {
+			header('HTTP/1.1 403 Forbidden');
+			echo 'You are not allowed to download this invoice.';
+			exit;
+		}
+	} else {
+		header('HTTP/1.1 403 Forbidden');
+		echo 'Please log in to download this invoice.';
+		exit;
+	}
+
 	$booking->order_id=$order_id;
 	$bookings = $booking->get_details_for_invoice_client();
+	if (!$bookings) {
+		header('HTTP/1.1 404 Not Found');
+		echo 'Invoice not found.';
+		exit;
+	}
 	
 	/*Business Id by location id*/
 	

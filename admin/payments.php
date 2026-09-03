@@ -48,10 +48,10 @@ $decimal=$settings->get_option('ct_price_format_decimal_places');
         <div class="panel-heading">
             <h1 class="panel-title"><?php echo $label_language_values['payments_history_details'];?></h1>
         </div>
-		<ul class="nav nav-tabs">
-			<li class="active"><a data-toggle="tab" href="#client-payments"><?php echo $label_language_values['client_payments'];?></a></li>
-			<li><a data-toggle="tab" href="#staff-payments"><?php echo $label_language_values['staff_payments'];?></a></li>
-			<li><a data-toggle="tab" href="#recurrence_listing"><?php echo $label_language_values['recurrence_details'];?></a></li>
+		<ul class="nav nav-tabs ct-segment-tabs">
+			<li class="active"><a data-toggle="tab" href="#client-payments"><i class="fa fa-credit-card"></i><?php echo $label_language_values['client_payments'];?></a></li>
+			<li><a data-toggle="tab" href="#staff-payments"><i class="fa fa-user-md"></i><?php echo $label_language_values['staff_payments'];?></a></li>
+			<li><a data-toggle="tab" href="#recurrence_listing"><i class="fa fa-repeat"></i><?php echo $label_language_values['recurrence_details'];?></a></li>
 		</ul>
         <div class="tab-content">
         <div id="client-payments" class="tab-pane fade in active">
