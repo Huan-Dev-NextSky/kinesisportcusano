@@ -498,7 +498,7 @@ if ($language_label_arr[1] != "" || $language_label_arr[3] != "" || $language_la
 												if($settings->get_option('ct_staff_registration') == 'Y'){
 												?>
 												<div class="clearfix">                                 
-												 <a type="button" class="btn btn-link col-xs-12" id="register_as_staff_btn">Register As Staff </a>                   
+												 <a type="button" class="btn btn-link col-xs-12" id="register_as_staff_btn">Register As Doctor </a>                   
 												 </div>
 												<?php } ?>
 										</div>
@@ -533,7 +533,7 @@ if ($language_label_arr[1] != "" || $language_label_arr[3] != "" || $language_la
 									<form id="staff_registration" name="staff_registration" method="POST">
 										<p class="register-meesg" id="register-meesg" style="display:none"> Thanks for registering with <?php echo $settings->get_option('ct_company_name'); ?>. Our administrators are currently reviewing your profile. Your staff account will be activated as soon as verification is completed. </p>
 											<div class="top-heading-common">
-												<h3> Register As Staff </h3>
+												<h3> Register As Doctor </h3>
 											</div>
 											<div class="form-group fl">
 												<i class="fa fa-user" aria-hidden="true"></i>

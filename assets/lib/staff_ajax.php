@@ -345,10 +345,22 @@ if (isset($_POST['u_member_email'])) {
 	$objadmin->APItestmode = isset($_POST['APItestmode']) ? $_POST['APItestmode'] : '';
 	$objadmin->image = $_POST['staff_image'];
 	$objadmin->role = isset($_POST['role']) ? $_POST['role'] : 'doctor';
-	// Kinesis Employee ID is fixed after create — keep existing mapping
-	$currMapQ = mysqli_query($conn, "SELECT `external_employee_id` FROM `ct_admin_info` WHERE `id` = " . (int)$objadmin->id . " LIMIT 1");
-	$currMapRow = $currMapQ ? mysqli_fetch_assoc($currMapQ) : null;
-	$objadmin->external_employee_id = ($currMapRow && !empty($currMapRow['external_employee_id'])) ? (int)$currMapRow['external_employee_id'] : null;
+	if (array_key_exists('external_employee_id', $_POST)) {
+		$objadmin->external_employee_id = ($_POST['external_employee_id'] !== '') ? (int)$_POST['external_employee_id'] : null;
+		if (!empty($objadmin->external_employee_id)) {
+			$dupQ = mysqli_query($conn, "SELECT `id`, `fullname` FROM `ct_admin_info` WHERE `role` != 'admin' AND `external_employee_id` = " . (int)$objadmin->external_employee_id . " AND `id` != " . (int)$objadmin->id . " LIMIT 1");
+			if ($dupQ && mysqli_num_rows($dupQ) > 0) {
+				$dupRow = mysqli_fetch_assoc($dupQ);
+				echo "duplicate_kinesis_employee:" . (isset($dupRow['fullname']) ? $dupRow['fullname'] : '');
+				exit;
+			}
+		}
+	} else {
+		/* Staff portal save — do not wipe Kinesis employee mapping */
+		$currMapQ = mysqli_query($conn, "SELECT `external_employee_id` FROM `ct_admin_info` WHERE `id` = " . (int)$objadmin->id . " LIMIT 1");
+		$currMapRow = $currMapQ ? mysqli_fetch_assoc($currMapQ) : null;
+		$objadmin->external_employee_id = ($currMapRow && !empty($currMapRow['external_employee_id'])) ? (int)$currMapRow['external_employee_id'] : null;
+	}
 
 	if ($_POST['ct_service_staff'] != '') {
 		$new_service = implode(",", $_POST['ct_service_staff']);
@@ -390,29 +402,34 @@ if (isset($_POST['u_member_email'])) {
 	$staff_read = $objadmin->readone();
 
 	$currExtId = isset($staff_read['external_employee_id']) ? $staff_read['external_employee_id'] : '';
-	$currExtLabel = '';
-	if ($currExtId !== '' && $currExtId !== null && (int)$currExtId > 0) {
-		$currExtLabel = 'ID: ' . $currExtId . ' (Current Mapped)';
-		if ($settings->get_option('kinesis_api_status') === 'Y') {
-			require_once dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwApiClient.php';
-			$awwClient = new AwwApiClient($conn);
-			$empRes = $awwClient->getAllEmployees();
-			if ($empRes['success'] && !empty($empRes['data'])) {
-				foreach ($empRes['data'] as $kEmp) {
-					$kId = isset($kEmp['id']) ? $kEmp['id'] : (isset($kEmp['Id']) ? $kEmp['Id'] : '');
-					if ((string)$kId !== (string)$currExtId) {
-						continue;
-					}
-					$kName = isset($kEmp['name']) ? $kEmp['name'] : (isset($kEmp['fullName']) ? $kEmp['fullName'] : (isset($kEmp['firstName']) ? ($kEmp['firstName'] . ' ' . (isset($kEmp['lastName']) ? $kEmp['lastName'] : '')) : 'Employee #' . $kId));
-					$kEmail = isset($kEmp['email']) ? $kEmp['email'] : (isset($kEmp['Email']) ? $kEmp['Email'] : '');
-					$currExtLabel = 'ID: ' . $kId . ' - ' . $kName . ($kEmail ? ' (' . $kEmail . ')' : '');
-					break;
+	if ($currExtId === null || (int)$currExtId <= 0) {
+		$currExtId = '';
+	}
+	$kinesis_employees_edit = array();
+	$used_kinesis_employee_ids = array();
+	$usedEmpQ = mysqli_query($conn, "SELECT `external_employee_id` FROM `ct_admin_info` WHERE `role` != 'admin' AND `external_employee_id` IS NOT NULL AND `external_employee_id` != 0 AND `id` != " . (int)$staff_id);
+	if ($usedEmpQ) {
+		while ($usedRow = mysqli_fetch_assoc($usedEmpQ)) {
+			$used_kinesis_employee_ids[(string)$usedRow['external_employee_id']] = true;
+		}
+	}
+	if ($settings->get_option('kinesis_api_status') === 'Y') {
+		require_once dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwApiClient.php';
+		$awwClient = new AwwApiClient($conn);
+		$empRes = $awwClient->getAllEmployees();
+		if ($empRes['success'] && !empty($empRes['data'])) {
+			foreach ($empRes['data'] as $kEmp) {
+				$kId = isset($kEmp['id']) ? $kEmp['id'] : (isset($kEmp['Id']) ? $kEmp['Id'] : '');
+				if ($kId === '') {
+					continue;
 				}
+				/* Allow current mapping + unused employees */
+				if ((string)$kId !== (string)$currExtId && isset($used_kinesis_employee_ids[(string)$kId])) {
+					continue;
+				}
+				$kinesis_employees_edit[] = $kEmp;
 			}
 		}
-	} else {
-		$currExtLabel = 'None / Local Only';
-		$currExtId = '';
 	}
 	?>
 
@@ -645,9 +662,23 @@ if (isset($_POST['u_member_email'])) {
 								<div class="form-group col-xs-12 col-md-12">
 									<div class="col-xs-4 col-md-2"><label for="ct-member-ext-id">Kinesis Employee (API)</label></div>
 									<div class="col-xs-8 col-md-10">
-										<input type="hidden" id="ct-member-ext-id" name="ct-member-ext-id" value="<?php echo htmlspecialchars((string)$currExtId); ?>" />
-										<input type="text" class="form-control" value="<?php echo htmlspecialchars($currExtLabel); ?>" readonly disabled style="background:#f5f5f5; cursor:not-allowed;" />
-										<small class="text-muted" style="display:block; margin-top:4px;">Mapped at creation — cannot be changed</small>
+										<select class="form-control" id="ct-member-ext-id" name="ct-member-ext-id">
+											<option value="">-- Select Kinesis Employee (None / Local Only) --</option>
+											<?php
+											if (!empty($kinesis_employees_edit)) {
+												foreach ($kinesis_employees_edit as $kEmp) {
+													$kId = isset($kEmp['id']) ? $kEmp['id'] : (isset($kEmp['Id']) ? $kEmp['Id'] : '');
+													$kName = isset($kEmp['name']) ? $kEmp['name'] : (isset($kEmp['fullName']) ? $kEmp['fullName'] : (isset($kEmp['firstName']) ? ($kEmp['firstName'] . ' ' . (isset($kEmp['lastName']) ? $kEmp['lastName'] : '')) : 'Employee #' . $kId));
+													$kEmail = isset($kEmp['email']) ? $kEmp['email'] : (isset($kEmp['Email']) ? $kEmp['Email'] : '');
+													$selected = ((string)$kId === (string)$currExtId) ? ' selected' : '';
+													echo '<option value="' . htmlspecialchars((string)$kId) . '"' . $selected . '>ID: ' . htmlspecialchars((string)$kId) . ' - ' . htmlspecialchars($kName) . ($kEmail ? ' (' . htmlspecialchars($kEmail) . ')' : '') . '</option>';
+												}
+											} elseif ($currExtId !== '') {
+												echo '<option value="' . htmlspecialchars((string)$currExtId) . '" selected>ID: ' . htmlspecialchars((string)$currExtId) . ' (Current Mapped)</option>';
+											}
+											?>
+										</select>
+										<small class="text-muted" style="display:block; margin-top:4px;">You can remap this doctor to another unused Kinesis employee</small>
 									</div>
 								</div>
 
@@ -753,12 +784,15 @@ if (isset($_POST['u_member_email'])) {
 											<?php
 											$getservice = $objservices->getalldata();
 											if ($getservice->num_rows > 0) {
+												$assigned_services = isset($staff_read['service_ids']) ? $staff_read['service_ids'] : (isset($staff_read[17]) ? $staff_read[17] : '');
 												while ($arr = @mysqli_fetch_array($getservice)) {
-													$get_service_assignid = explode(",", $staff_read[17]);
-													if (in_array($arr[0], $get_service_assignid)) {
-														echo "<option selected='selected' value='" . $arr[0] . "'>" . $arr[1] . "</option>";
+													$get_service_assignid = explode(",", $assigned_services);
+													$svc_id = isset($arr['id']) ? $arr['id'] : $arr[0];
+													$svc_title = isset($arr['title']) ? $arr['title'] : $arr[1];
+													if (in_array($svc_id, $get_service_assignid)) {
+														echo "<option selected='selected' value='" . $svc_id . "'>" . htmlspecialchars($svc_title) . "</option>";
 													} else {
-														echo "<option value='" . $arr[0] . "'>" . $arr[1] . "</option>";
+														echo "<option value='" . $svc_id . "'>" . htmlspecialchars($svc_title) . "</option>";
 													}
 												}
 											}
@@ -1847,6 +1881,12 @@ if (isset($_POST['get_payment_staff_by_date'])) {
 	<?php
 }
 if (isset($_POST['action']) && $_POST['action'] == 'payment_status_of_staff') {
+	/* Doctor cannot mark payments — Root Admin only */
+	if (!isset($_SESSION['ct_adminid'])) {
+		header('HTTP/1.1 403 Forbidden');
+		echo 'Forbidden';
+		exit;
+	}
 	$objpayment->order_id = $_POST['order_id'];
 	$objpayment->payment_status = "Completed";
 	$result = $objpayment->update_payment_status_of_staff();

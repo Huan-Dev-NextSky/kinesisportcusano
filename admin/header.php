@@ -398,7 +398,7 @@ if ($language_label_arr[1] != "" || $language_label_arr[3] != "" || $language_la
    </style>
    <!-- Manual Booking CSS Files End -->
    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/cta-reset.min.css" type="text/css" media="all">
-   <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/cta-admin-style.css" type="text/css" media="all">
+   <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/cta-admin-style.css?v=<?php echo @filemtime(dirname(dirname(__FILE__)) . '/assets/css/cta-admin-style.css') ?: time(); ?>" type="text/css" media="all">
    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/cta-admin-common.css" type="text/css" media="all">
    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/cta-admin-responsive.css" type="text/css" media="all">
    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/bootstrap/bootstrap.min.css" type="text/css" media="all">
@@ -844,6 +844,9 @@ if ($language_label_arr[1] != "" || $language_label_arr[3] != "" || $language_la
                            <li class="<?php if (strpos($_SERVER['SCRIPT_NAME'], 'my-appointments.php') != false) {
                                           echo 'active';
                                        } ?>"><a href="<?php echo BASE_URL; ?>/admin/my-appointments.php"><i class="fa fa-calendar"></i><span><?php echo $label_language_values['my_appointments']; ?></span></a></li>
+                           <li class="<?php if (strpos($_SERVER['SCRIPT_NAME'], 'my-bookings.php') != false) {
+                                          echo 'active';
+                                       } ?>"><a href="<?php echo BASE_URL; ?>/admin/my-bookings.php"><i class="fa fa-list"></i><span><?php echo (isset($label_language_values['bookings']) && $label_language_values['bookings'] !== '') ? $label_language_values['bookings'] : 'List Bookings'; ?></span></a></li>
                            <li class="<?php if (strpos($_SERVER['SCRIPT_NAME'], 'user-profile.php') != false) {
                                           echo 'active';
                                        } ?>"><a href="<?php echo BASE_URL; ?>/admin/user-profile.php"><i class="fa fa-user"></i><span><?php echo $label_language_values['profile']; ?></span></a></li>

@@ -1,5 +1,8 @@
 <?php
-
+/**
+ * Customer — List Bookings (table view).
+ * Calendar view remains on my-appointments.php.
+ */
 include (dirname(__FILE__) . '/header.php');
 include (dirname(__FILE__) . '/admin_session_check.php');
 include (dirname(dirname(__FILE__)) . "/objects/class_userdetails.php");
@@ -12,6 +15,7 @@ include (dirname(dirname(__FILE__)) . "/objects/class_order_client_info.php");
 if (!isset($_SESSION['ct_login_user_id']))
 {
     header('Location:' . SITE_URL . "admin/");
+    exit;
 }
 $con = new cleanto_db();
 $conn = $con->connect();
@@ -57,49 +61,20 @@ else
 {
     $timediffmis = str_replace('+', '', $timezonediff) * 60;
     $currDateTime_withTZ = strtotime("+" . $timediffmis . " minutes", strtotime(date('Y-m-d H:i:s')));
-} ?>
-<style>
-#cta .fc-time-grid-event {
-	min-height: 32px;
-	overflow: auto;
-	height: 102px !important;
 }
-#cta-user-appointments #ct-calendar-all {
-	margin-top: 0;
-}
-#cta-user-appointments .ct-legends-panel-body {
-	padding-top: 0 !important;
-}
-</style>
-
-	<div id="cta-user-appointments">    
+$list_bookings_label = isset($label_language_values['bookings']) && $label_language_values['bookings'] !== ''
+	? $label_language_values['bookings']
+	: 'List Bookings';
+?>
+	<div id="cta-user-appointments" class="ct-customer-list-bookings">    
 		<div class="panel-body">        
 			<div class="tab-content">            
-				<h4 class="header4"><?php echo $label_language_values['my_appointments']; ?>	
+				<h4 class="header4"><?php echo htmlspecialchars($list_bookings_label); ?>
 					<a href="<?php echo SITE_URL; ?>" class="btn btn-success pull-right" target="_BLANK"><?php echo $label_language_values['book_appointment']; ?></a>
-					</h4>
-
-			<div id="ct-calendar-all">
-				<div class="ct-legends-panel-body">
-					<div class="ct-legends-main">
-						<div class="ct-legends-inner">
-							<ul class="list-inline nm">
-								<li><h4><?php echo $label_language_values['legends']; ?>:</h4></li>
-								<li><i class="fa fa-thumbs-o-up txt-completed"></i> <?php echo $label_language_values['completed']; ?></li>
-								<li><i class="fa fa-check txt-success"></i> <?php echo $label_language_values['confirmed']; ?></li>
-								<li><i class="fa fa-pencil-square-o txt-info"></i> <?php echo $label_language_values['rescheduled']; ?></li>
-								<li><i class="fa fa-ban txt-danger"></i> <?php echo $label_language_values['rejected']; ?></li>
-								<li><i class="fa fa-times txt-primary"></i> <?php echo $label_language_values['cancelled_by_client']; ?></li>
-								<li><i class="fa fa-info-circle txt-warning"></i> <?php echo $label_language_values['pending']; ?></li>
-							</ul>
-						</div>
-					</div>
-				</div>
-				<div id="calendar" class="ct-booking-calendar"></div>
-			</div>
+				</h4>
 
 				<?php
-$ct_customer_show_booking_table = false;
+$ct_customer_show_booking_table = true;
 include(dirname(__FILE__) . '/includes/customer_booking_modals.php');
 ?>
 <?php if ($gc_hook->gc_purchase_status() == 'exist')
@@ -111,7 +86,7 @@ include(dirname(__FILE__) . '/includes/customer_booking_modals.php');
 		<input type="hidden" id="extension_js" value="false" />        
     <?php } } ?>
 <script type="text/javascript">
-	window.ct_customer_calendar = true;
+	window.ct_customer_calendar = false;
 	window.ct_doctor_calendar_readonly = false;
 </script>
 <?php

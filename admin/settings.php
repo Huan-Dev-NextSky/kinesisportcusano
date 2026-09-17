@@ -2793,7 +2793,7 @@ if (isset($_POST['btn_submit_app_labels'])) {
                           } ?> id="ct_staff_regist" data-on="<?php echo $label_language_values['enable']; ?>" data-off="<?php echo $label_language_values['disable']; ?>" data-onstyle='success' data-offstyle='danger' />
                         </label>
                       </div>
-                      <a class="ct-tooltip-link" href="#" data-toggle="tooltip" title="<?php echo "With enable this feature shows staff registration by admin "; ?>."><i class="fa fa-info-circle fa-lg"></i></a>
+                      <a class="ct-tooltip-link" href="#" data-toggle="tooltip" title="<?php echo "With enable this feature shows doctor registration by admin "; ?>."><i class="fa fa-info-circle fa-lg"></i></a>
                     </td>
                   </tr>
                   <tr>
@@ -2806,7 +2806,7 @@ if (isset($_POST['btn_submit_app_labels'])) {
                           } ?> id="ct_staff_zipcodes" data-on="<?php echo $label_language_values['enable']; ?>" data-off="<?php echo $label_language_values['disable']; ?>" data-onstyle='success' data-offstyle='danger' />
                         </label>
                       </div>
-                      <a class="ct-tooltip-link" href="#" data-toggle="tooltip" title="<?php echo "With enable this feature front staff showing on zipcode by admin "; ?>."><i class="fa fa-info-circle fa-lg"></i></a>
+                      <a class="ct-tooltip-link" href="#" data-toggle="tooltip" title="<?php echo "With enable this feature front doctor showing on zipcode by admin "; ?>."><i class="fa fa-info-circle fa-lg"></i></a>
                     </td>
                   </tr>
                   <tr>
@@ -5080,7 +5080,7 @@ if (isset($_POST['btn_submit_app_labels'])) {
           <ul class="nav nav-tabs nav-justified ct-segment-tabs">
             <li class="active"><a data-toggle="tab" href="#client-sms-template"><i class="fa fa-user"></i><?php echo $label_language_values['client_sms_templates']; ?></a></li>
             <li><a data-toggle="tab" href="#admin-sms-template"><i class="fa fa-shield"></i><?php echo $label_language_values['admin_sms_template']; ?></a></li>
-            <li><a data-toggle="tab" href="#staff-sms-template"><i class="fa fa-user-md"></i>Staff SMS Template</a></li>
+            <li><a data-toggle="tab" href="#staff-sms-template"><i class="fa fa-user-md"></i>Doctor SMS Template</a></li>
 
           </ul>
           <div class="tab-content">
@@ -5308,7 +5308,7 @@ if (isset($_POST['btn_submit_app_labels'])) {
             </div>
 
             <div id="staff-sms-template" class="tab-pane fade">
-              <h3>Staff SMS Template</h3>
+              <h3>Doctor SMS Template</h3>
               <div id="accordion" class="panel-group">
                 <ul class="nav nav-tab nav-stacked">
                   <?php
@@ -7685,7 +7685,10 @@ if (isset($_POST['btn_submit_app_labels'])) {
           var custEmail = row.customer_email || '';
           var custPhone = row.customer_phone || '';
           var apptDate = row.event_start || row.booking_date_time || '-';
-          var serviceName = row.service_name || row.event_summary || 'Service';
+          var serviceName = row.service_name || '';
+          if (!serviceName) {
+            serviceName = (row.sync_status === 'FAILED') ? '—' : (row.event_summary || '—');
+          }
           var staffName = row.staff_name ? ('<br /><small class="text-muted"><i class="fa fa-user-md"></i> ' + row.staff_name + '</small>') : '';
 
           // GCal Badge

@@ -21,6 +21,25 @@ $setting=new cleanto_setting();
 $conn=$database->connect();
 $database->conn=$conn;
 $setting->conn=$conn;
+
+/* Require Root Admin for sensitive Kinesis / GCal sync actions */
+$ct_admin_only_actions = array(
+	'test_kinesis_connection',
+	'sync_kinesis_services',
+	'sync_gcal_to_system',
+	'sync_system_to_kinesis',
+	'get_sync_history',
+	'sync_single_order_to_kinesis',
+	'update_kinesis_setting'
+);
+if (isset($_POST['action']) && in_array($_POST['action'], $ct_admin_only_actions, true)) {
+	if (!isset($_SESSION['ct_adminid'])) {
+		header('Content-Type: application/json');
+		http_response_code(403);
+		echo json_encode(array('success' => false, 'ok' => false, 'message' => 'Unauthorized', 'error' => 'unauthorized'));
+		exit;
+	}
+}
 $objservice = new cleanto_services();
 $objservice->conn = $conn;
 $objuser = new cleanto_users();
@@ -350,14 +369,32 @@ if(isset($_POST['action']) && $_POST['action']=='sync_kinesis_services'){
 }
 
 if(isset($_POST['action']) && $_POST['action']=='sync_gcal_to_system'){
-  require_once(dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwGCalSync.php');
-  
-  $sync = new AwwGCalSync($conn);
-  $daysPast = isset($_POST['days_past']) ? (int)$_POST['days_past'] : 7;
-  $daysFuture = isset($_POST['days_future']) ? (int)$_POST['days_future'] : 60;
-  $res = $sync->syncAll($daysPast, $daysFuture);
-  
+  // Old Google API client emits PHP 8 deprecations; keep AJAX response as clean JSON.
+  $prevDisplay = ini_get('display_errors');
+  $prevReporting = error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED & ~E_NOTICE);
+  ini_set('display_errors', '0');
+
   header('Content-Type: application/json');
+  try {
+    require_once(dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwGCalSync.php');
+    $sync = new AwwGCalSync($conn);
+    $daysPast = isset($_POST['days_past']) ? (int)$_POST['days_past'] : 7;
+    $daysFuture = isset($_POST['days_future']) ? (int)$_POST['days_future'] : 60;
+    $res = $sync->syncAll($daysPast, $daysFuture);
+  } catch (Throwable $e) {
+    $res = array(
+      'success' => false,
+      'message' => 'Google Calendar sync failed: ' . $e->getMessage(),
+      'created' => 0,
+      'updated' => 0,
+      'cancelled' => 0,
+      'skipped' => 0,
+      'total' => 0
+    );
+  }
+
+  ini_set('display_errors', $prevDisplay);
+  error_reporting($prevReporting);
   echo json_encode($res);
   exit;
 }
@@ -396,11 +433,18 @@ if(isset($_POST['action']) && $_POST['action']=='get_sync_history'){
   }
 
   $whereSql = count($where) > 0 ? "WHERE " . implode(' AND ', $where) : "";
-  $query = "SELECT s.*, b.booking_status, b.booking_date_time, b.kinesis_sync_status as booking_kinesis_status, srv.title as service_name, adm.fullname as staff_name
+  $query = "SELECT s.*, b.booking_status, b.booking_date_time, b.staff_ids, b.kinesis_sync_status as booking_kinesis_status,
+                   srv.title as service_name,
+                   COALESCE(adm.fullname, adm2.fullname, adm3.fullname) as staff_name
             FROM `ct_gcal_kinesis_sync` s
             LEFT JOIN `ct_bookings` b ON (s.local_order_id = b.order_id OR s.local_booking_id = b.id)
             LEFT JOIN `ct_services` srv ON (s.service_id = srv.id OR s.service_id = srv.external_service_id)
             LEFT JOIN `ct_admin_info` adm ON s.employee_id = adm.id
+            LEFT JOIN `ct_admin_info` adm2 ON s.employee_id = adm2.external_employee_id
+            LEFT JOIN `ct_admin_info` adm3 ON (
+              b.staff_ids IS NOT NULL AND b.staff_ids != '' AND
+              CAST(SUBSTRING_INDEX(b.staff_ids, ',', 1) AS UNSIGNED) = adm3.id
+            )
             {$whereSql}
             GROUP BY s.id
             ORDER BY s.updated_at DESC, s.id DESC

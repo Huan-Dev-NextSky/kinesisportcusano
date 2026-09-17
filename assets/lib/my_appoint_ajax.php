@@ -1,4 +1,7 @@
 <?php          
+if (session_status() === PHP_SESSION_NONE) {
+	session_start();
+}
 require_once(dirname(__FILE__).'/ct_sms_opt_in.php');
 include(dirname(dirname(dirname(__FILE__)))."/objects/class_connection.php");
 include(dirname(dirname(dirname(__FILE__)))."/objects/class_dashboard.php");
@@ -30,6 +33,41 @@ $objdashboard = new cleanto_dashboard();
 $objdashboard->conn = $conn;
 $gc_hook = new cleanto_gcHook();
 $gc_hook->conn = $conn;
+
+/* Hard-delete booking: handle early so it cannot be blocked by later branches */
+if (isset($_POST['delete_booking'])) {
+	$is_admin = isset($_SESSION['ct_adminid']);
+	if (!$is_admin) {
+		header('Content-Type: text/plain; charset=utf-8');
+		echo "0";
+		exit;
+	}
+	$id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+	$pid = isset($_POST['pid']) ? $_POST['pid'] : '';
+	$gc_event_id = isset($_POST['gc_event_id']) ? $_POST['gc_event_id'] : '';
+	$gc_staff_event_id = isset($_POST['gc_staff_event_id']) ? $_POST['gc_staff_event_id'] : '';
+	if ($id <= 0) {
+		header('Content-Type: text/plain; charset=utf-8');
+		echo "0";
+		exit;
+	}
+	/* Delete local records first (source of truth for UI) */
+	$objdashboard->delete_booking($id);
+	/* Best-effort remote cleanup; never block local delete */
+	try {
+		if ($gc_hook->gc_purchase_status() == 'exist') {
+			@$gc_hook->gc_cancel_reject_booking_hook();
+		}
+	} catch (Throwable $e) { }
+	try {
+		@mysqli_query($conn, "UPDATE `ct_gcal_kinesis_sync` SET `sync_status` = 'CANCELLED', `sync_action` = 'CANCEL', `last_sync_message` = 'Local booking deleted by admin', `updated_at` = NOW() WHERE `local_order_id` = {$id}");
+	} catch (Throwable $e) { }
+	header('Content-Type: text/plain; charset=utf-8');
+	echo "deleted";
+	exit;
+}
+
+/* Continue with remaining handlers below */
 $objadminprofile = new cleanto_adminprofile();
 $objadminprofile->conn = $conn;
 $objadmin = new cleanto_adminprofile();
@@ -374,35 +412,35 @@ if(isset($_POST['getcleintdetailwith_updatereadstatus'])){
 								}
                                 if($orderdetail[6]=='A')
                                 {
-                                    $booking_stats=$label_language_values['active'];
+                                    $booking_stats='<i class="fa fa-info-circle txt-warning"></i> '.$label_language_values['pending'];
                                 }
                                 elseif($orderdetail[6]=='C')
                                 {
-                                    $booking_stats='<i class="fa fa-check txt-success">'.$label_language_values['confirmed'].'</i>';
+                                    $booking_stats='<i class="fa fa-check txt-success"></i> '.$label_language_values['confirmed'];
                                 }
                                 elseif($orderdetail[6]=='R')
                                 {
-                                    $booking_stats='<i class="fa fa-ban txt-danger">'.$label_language_values['rejected'].'</i>';
+                                    $booking_stats='<i class="fa fa-ban txt-danger"></i> '.$label_language_values['rejected'];
                                 }
                                 elseif($orderdetail[6]=='RS')
                                 {
-                                    $booking_stats='<i class="fa fa-pencil-square-o txt-info">'.$label_language_values['rescheduled'].'</i>';
+                                    $booking_stats='<i class="fa fa-pencil-square-o txt-info"></i> '.$label_language_values['rescheduled'];
                                 }
                                 elseif($orderdetail[6]=='CC')
                                 {
-                                    $booking_stats='<i class="fa fa-times txt-primary">'.$label_language_values['cancelled_by_client'].'</i>';
+                                    $booking_stats='<i class="fa fa-times txt-primary"></i> '.$label_language_values['cancelled_by_client'];
                                 }
                                 elseif($orderdetail[6]=='CS')
                                 {
-                                    $booking_stats='<i class="fa fa-times-circle-o txt-info">'.$label_language_values['cancelled_by_service_provider'].'</i>';
+                                    $booking_stats='<i class="fa fa-times-circle-o txt-info"></i> '.$label_language_values['cancelled_by_service_provider'];
                                 }
                                 elseif($orderdetail[6]=='CO')
                                 {
-                                    $booking_stats='<i class="fa fa-thumbs-o-up txt-success">'.$label_language_values['appointment_completed'].'</i>';
+                                    $booking_stats='<i class="fa fa-thumbs-o-up txt-completed"></i> '.$label_language_values['completed'];
                                 }
                                 else
                                 {
-                                    $booking_stats='<i class="fa fa-thumbs-o-down txt-danger">'.$label_language_values['appointment_marked_as_no_show'].'</i>';
+                                    $booking_stats='<i class="fa fa-thumbs-o-down txt-danger"></i> '.$label_language_values['appointment_marked_as_no_show'];
                                 }
                                 echo $booking_stats;
                                 ?>
@@ -2980,7 +3018,7 @@ elseif(isset($_POST['confirm_booking_cal'])){
 					<?php 
 					if($b['booking_status']=='A')
 					{
-						$booking_stats='<span class="ct-label bg-info br-2">'.$label_language_values['active'].'</span>';
+						$booking_stats='<span class="ct-label bg-info br-2">'.$label_language_values['pending'].'</span>';
 					}
 					elseif($b['booking_status']=='C')
 					{
@@ -3060,7 +3098,7 @@ elseif(isset($_POST['confirm_booking_cal'])){
 					<?php 
 					if($b['booking_status']=='A')
 					{
-						$booking_stats='<span class="ct-label bg-info br-2">'.$label_language_values['active'].'</span>';
+						$booking_stats='<span class="ct-label bg-info br-2">'.$label_language_values['pending'].'</span>';
 					}
 					elseif($b['booking_status']=='C')
 					{
@@ -3840,41 +3878,12 @@ elseif(isset($_POST['confirm_booking_cal'])){
 	}	
   /*SMS SENDING CODE END*/
 } 
-elseif(isset($_POST['delete_booking'])){
-  if (!isset($_SESSION['ct_adminid']) && !isset($_SESSION['ct_staffid'])) {
-    echo "0";
-    exit;
-  }
-  $id = $_POST['id'];
-	$pid = $_POST['pid'];
-	$gc_event_id = $_POST['gc_event_id'];
-	$gc_staff_event_id = $_POST['gc_staff_event_id'];
-	if($gc_hook->gc_purchase_status() == 'exist'){
-		echo $gc_hook->gc_cancel_reject_booking_hook();
-	}
-  /* Cancel on Kinesis before hard-delete removes local mapping */
-  $orderEsc = (int)$id;
-  $kChk = @mysqli_query($conn, "SELECT `kinesis_appointment_id`, `kinesis_customer_id` FROM `ct_bookings` WHERE `order_id` = {$orderEsc} LIMIT 1");
-  $kRow = ($kChk && ($kr = mysqli_fetch_assoc($kChk))) ? $kr : null;
-  if ($kRow && !empty($kRow['kinesis_appointment_id'])) {
-    @mysqli_query($conn, "UPDATE `ct_bookings` SET `booking_status` = 'CS', `kinesis_sync_status` = 'CANCEL_PENDING' WHERE `order_id` = {$orderEsc}");
-    require_once(dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwAppointmentSync.php');
-    $kinesisSync = new AwwAppointmentSync($conn);
-    $kinesisSync->syncSingleBooking($orderEsc);
-  }
-  @mysqli_query($conn, "UPDATE `ct_gcal_kinesis_sync` SET `sync_status` = 'CANCELLED', `sync_action` = 'CANCEL', `last_sync_message` = 'Local booking deleted by admin', `updated_at` = NOW() WHERE `local_order_id` = {$orderEsc}");
-  $objdashboard->delete_booking($id);
-}
 elseif(isset($_POST['delete_recurring_booking'])){
-	  $recurring_id1 = $_POST['recurring_id'];
-	  $pid = $_POST['pid'];
-	  $gc_event_id = $_POST['gc_event_id'];
-	  $gc_staff_event_id = $_POST['gc_staff_event_id'];
-	  if($gc_hook->gc_purchase_status() == 'exist'){
-		  echo $gc_hook->gc_cancel_reject_booking_hook();
-	  }
-	$objdashboard->delete_recurring_booking($recurring_id1);
-  }
+	/* Delete All Recurring feature removed */
+	http_response_code(403);
+	echo 'disabled';
+	exit;
+}
 if(isset($_POST['reschedual_booking_admin']) && $_POST['reschedual_booking_admin'] == 'yes'){
   $order_id = $_POST['order_id'];
 	$booking->order_id= $_POST['order_id'];
@@ -3883,10 +3892,10 @@ if(isset($_POST['reschedual_booking_admin']) && $_POST['reschedual_booking_admin
 
 	?>
 	<div class="modal-dialog modal-md">
-		<div class="modal-content">
+		<div class="modal-content ct-admin-reschedule-modal">
 			<div class="modal-header">
 				<button type="button" class="close" data-dismiss="modal">&times;</button>
-				<h4 class="modal-title"><?php echo $label_language_values['reschedule']; ?></h4>
+				<h4 class="modal-title"><i class="fa fa-calendar"></i> <?php echo $label_language_values['reschedule']; ?></h4>
 			</div>
 			<div class="modal-body">
 				<div class="col-xs-12">
@@ -3899,14 +3908,30 @@ if(isset($_POST['reschedual_booking_admin']) && $_POST['reschedual_booking_admin
 					</div>
 				</div>
 				<div class="insert_staff_cal_timeslots">
-					<?php if (isset($dd['staff_ids']) && $dd['staff_ids'] != "" && $dd['staff_ids'] != 1) { 
+					<?php
 						$objoci->order_id = $_POST['order_id'];
 						$oci = $objoci->readone_order_client();
-
+						$rs_notes_val = '';
+						if (isset($oci['client_personal_info']) && $oci['client_personal_info'] !== '' && $oci['client_personal_info'] !== null) {
+							$personal_raw = $oci['client_personal_info'];
+							$decoded = @base64_decode($personal_raw, true);
+							if ($decoded === false) {
+								$decoded = $personal_raw;
+							}
+							$pinfo = @unserialize($decoded);
+							if ($pinfo === false) {
+								$pinfo = @unserialize($personal_raw);
+							}
+							if (is_array($pinfo) && isset($pinfo['notes'])) {
+								$rs_notes_val = $pinfo['notes'];
+							}
+						}
+					?>
+					<?php if (isset($dd['staff_ids']) && $dd['staff_ids'] != "" && $dd['staff_ids'] != 1) { 
 						$get_staff_assignid = explode(",",$booking->fetch_staff_of_booking());
 
 						$staff_html = "";
-						$staff_html .= "<select id='select_reschedule_staff' class='selectpicker col-md-10' data-live-search='true' data-actions-box='true' data-orderid='".$order_id."'>";
+						$staff_html .= "<select id='select_reschedule_staff' class='selectpicker' data-live-search='true' data-width='100%' data-orderid='".$order_id."'>";
 
 						$booking->booking_date_time = $dd['booking_date_time'];
 
@@ -3946,8 +3971,7 @@ if(isset($_POST['reschedual_booking_admin']) && $_POST['reschedual_booking_admin
 						<div class="col-xs-12">
 							<label class="cta-col2 ct-w-50"><?php echo $label_language_values['select_staff']; ?>:</label>
 							<div class="cta-col6 reschedule-staffs"><?php  echo $staff_html; ?></div>
-								<div class="cta-col4"><a href='javascript:void(0)' data-orderid='<?php  echo $order_id; ?>' class='select_res_date_time edit_staff btn btn-info' data-order-duration="<?php echo $oci['order_duration']; ?>"><?php echo $label_language_values['select_date_&_time']; ?></a>
-							</div>
+							<a href="javascript:void(0)" data-orderid="<?php echo $order_id; ?>" class="select_res_date_time ct-reschedule-autoload" data-order-duration="<?php echo isset($oci['order_duration']) ? $oci['order_duration'] : ''; ?>" style="display:none;" aria-hidden="true"></a>
 						</div>
 						<?php 
 							$dates = date("Y-m-d",strtotime($dd['booking_date_time']));
@@ -3963,20 +3987,20 @@ if(isset($_POST['reschedual_booking_admin']) && $_POST['reschedual_booking_admin
 								$staff_id = $staff_id_array[0];
 							}
 						?>
-						<div class="col-xs-12 date_time_selection mb-5" style="display: none;">
+						<div class="col-xs-12 date_time_selection mb-5">
 							<div class="form-group">
 								<label class="cta-col7 ct-w-50"><b><?php echo $label_language_values['current_booking_date_&_time']; ?>:</b></label>
 								<div class="cta-col5 ct-w-50 mt-5"><b><?php echo $dates.' '.$time_new; ?></b></div>
 							</div>
 						</div>
 
-						<div class="col-xs-12 date_time_selection" style="display: none;">
+						<div class="col-xs-12 date_time_selection">
 							<div class="form-group">
 								<label class="cta-col2 ct-w-50"><?php echo $label_language_values['select_date_&_time']; ?>:</label>
 								<div class="cta-col4 ct-w-50 mt-10">
 
 						 
-									<input class="form-control selected_res_date" id="expiry_date<?php  echo $dd['order_id'];?>" data-staffid="<?php echo $staff_id; ?>" value="<?php echo $dates;?>" data-date-format="yyyy/mm/dd" data-provide="datepicker" data-cur-date="<?php echo date('Y-m-d'); ?>" data-booked-slot="<?php echo $slot_time; ?>" />
+									<input class="form-control selected_res_date" id="expiry_date<?php  echo $dd['order_id'];?>" data-staffid="<?php echo $staff_id; ?>" data-original-date="<?php echo $dates; ?>" value="<?php echo $dates;?>" data-date-format="yyyy/mm/dd" data-cur-date="<?php echo date('Y-m-d'); ?>" data-booked-slot="<?php echo $slot_time; ?>" />
 								</div>
 								<div class="cta-col6 ct-w-50 mt-10 float-right reschedule_slots_booking">
 						
@@ -4103,14 +4127,14 @@ if(isset($_POST['reschedual_booking_admin']) && $_POST['reschedual_booking_admin
 					<div class="form-group">
 						<label class="cta-col2 ct-w-50"><?php echo $label_language_values['notes']; ?>:</label>
 						<div class="cta-col8">
-							<textarea class="form-control" id="rs_notes" class="rs_notes"></textarea>
+							<textarea class="form-control rs_notes" id="rs_notes"><?php echo htmlspecialchars($rs_notes_val, ENT_QUOTES, 'UTF-8'); ?></textarea>
 						</div>
 					</div>
 				</div>
 				<div class="clearfix"></div>	
 			</div>
 			<div class="modal-footer">
-				<a href="javascript:void(0);" class="pull-left btn btn-info" id="edit_reschedual" data-gc_event="<?php echo $dd['gc_event_id']; ?>" data-gc_staff_event="<?php echo $dd['gc_staff_event_id']; ?>" data-pid="<?php echo $dd['staff_ids']; ?>" data-order="<?php echo $dd['order_id'];?>"><?php echo $label_language_values['update_appointment']; ?></a>
+				<a href="javascript:void(0);" class="btn btn-info ct-rs-submit" id="edit_reschedual" data-gc_event="<?php echo $dd['gc_event_id']; ?>" data-gc_staff_event="<?php echo $dd['gc_staff_event_id']; ?>" data-pid="<?php echo $dd['staff_ids']; ?>" data-order="<?php echo $dd['order_id'];?>"><?php echo $label_language_values['update_appointment']; ?></a>
 			</div>
 		</div>
 	</div>

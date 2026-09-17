@@ -162,11 +162,15 @@ elseif(isset($_POST['operationadd']))
         $objservice->color = $_POST['color'];
         $objservice->title = filter_var(mysqli_real_escape_string($conn,ucwords($_POST['title'])), FILTER_SANITIZE_STRING);
         $objservice->description = mysqli_real_escape_string($conn,$_POST['description']);
+        $objservice->price = isset($_POST['price']) ? (float)$_POST['price'] : 0;
+        $objservice->duration = isset($_POST['duration']) ? (int)$_POST['duration'] : 0;
         $objservice->status = $_POST['status'];
         $objservice->position = $_POST['position'];
+        $objservice->ensure_price_duration_schema();
         $insertid = $objservice->add_service();
         $objservice->image = $_POST['image'];
         $objservice->update_recordfor_image($insertid);
+        $objservice->sync_price_duration_to_units($insertid);
         /* REMOVE UNSED IMAGES FROM FOLDER */
         $used_images = $objservice->get_used_images();
         $imgarr = array();
@@ -270,7 +274,11 @@ elseif(isset($_POST['operationedit']))
 	$objservice->description = $_POST['description'];
 	$objservice->title = filter_var(mysqli_real_escape_string($conn,ucwords($_POST['title'])), FILTER_SANITIZE_STRING);
 	$objservice->image = $_POST['image'];
+	$objservice->price = isset($_POST['price']) ? (float)$_POST['price'] : 0;
+	$objservice->duration = isset($_POST['duration']) ? (int)$_POST['duration'] : 0;
+	$objservice->ensure_price_duration_schema();
 	$objservice->update_service();
+	$objservice->sync_price_duration_to_units((int)$_POST['id']);
 	/* REMOVE UNSED IMAGES FROM FOLDER */
 	$used_images = $objservice->get_used_images();
 	$imgarr = array();

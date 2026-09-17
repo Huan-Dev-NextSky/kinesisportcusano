@@ -62,12 +62,12 @@ class AwwApiClient {
     /**
      * Persist tokens in database
      */
-    private function saveTokens($accessToken, $refreshToken, $expiresInSeconds = 900) {
+    private function saveTokens($accessToken, $refreshToken, $expiresInSeconds = 900, $persist = true) {
         $this->accessToken = $accessToken;
         $this->refreshToken = $refreshToken;
         $this->tokenExpiresAt = time() + $expiresInSeconds;
 
-        if ($this->setting) {
+        if ($persist && $this->setting) {
             $this->setting->set_option('kinesis_api_access_token', $this->accessToken);
             $this->setting->set_option('kinesis_api_refresh_token', $this->refreshToken);
             $this->setting->set_option('kinesis_api_token_expires_at', (string)$this->tokenExpiresAt);
@@ -92,7 +92,7 @@ class AwwApiClient {
     /**
      * Perform login (POST /api/account/login)
      */
-    public function login($username = null, $password = null) {
+    public function login($username = null, $password = null, $persistTokens = true) {
         $user = $username ?: $this->username;
         $pass = $password ?: $this->password;
 
@@ -116,7 +116,8 @@ class AwwApiClient {
             $this->saveTokens(
                 $response['data']['accessToken'],
                 $response['data']['refreshToken'],
-                900 // 15 minutes as per v3.0 specification
+                900, // 15 minutes as per v3.0 specification
+                $persistTokens
             );
             return array(
                 'success' => true,
@@ -311,7 +312,8 @@ class AwwApiClient {
      * Test connection with current settings
      */
     public function testConnection() {
-        $loginRes = $this->login();
+        /* Do not persist JWT — testing must not overwrite saved tokens */
+        $loginRes = $this->login(null, null, false);
         if (!$loginRes['success']) {
             return array(
                 'success' => false,

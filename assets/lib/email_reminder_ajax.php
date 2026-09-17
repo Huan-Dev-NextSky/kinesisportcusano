@@ -755,7 +755,7 @@ if($book_details->num_rows > 0){
 					
 					
 					/* Client Email Template */
-					$emailtemplate->email_subject="Staff Appointment Reminder";
+					$emailtemplate->email_subject="Doctor Appointment Reminder";
 					$emailtemplate->user_type="S";
 					$clientemailtemplate=$emailtemplate->readone_client_email_template_body();
 

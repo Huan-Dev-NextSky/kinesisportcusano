@@ -339,13 +339,13 @@ else
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 	<link rel="shortcut icon" type="image/png" href="<?php echo BASE_URL; ?>/assets/images/backgrounds/<?php echo $setting->get_option('ct_favicon_image');?>"/>
-    <title>Cleanto | Staff
+    <title>Cleanto | Doctor
 </title>
 
     <meta name="description" content="" />
     <meta name="author" content="" />
     <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/cta-reset.min.css" type="text/css" media="all">
-    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/cta-admin-style.css" type="text/css" media="all">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/cta-admin-style.css?v=<?php echo @filemtime(dirname(dirname(__FILE__)) . '/assets/css/cta-admin-style.css') ?: time(); ?>" type="text/css" media="all">
     <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/cta-admin-common.css" type="text/css" media="all">
     <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/cta-admin-responsive.css" type="text/css" media="all">
     <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/bootstrap/bootstrap.min.css" type="text/css" media="all">
@@ -659,13 +659,18 @@ else
                     </div>
                     <div id="navbarCollapseMain" class="collapse navbar-collapse">
                         <ul class="nav navbar-nav cta-nav-tab" id="cta-staff-nav">
-                            <li class="active">
-                                <a href="#my-bookings" class="my-bookings" data-toggle="pill">
-                                    <i class="fa fa-calendar"></i><span><?php echo $label_language_values['bookings']; ?></span>
+                            <li class="<?php if (strpos($_SERVER['SCRIPT_NAME'], 'appointments.php') !== false) { echo 'active'; } ?>">
+                                <a href="<?php echo SITE_URL; ?>staff/appointments.php">
+                                    <i class="fa fa-calendar"></i><span><?php echo isset($label_language_values['appointments']) ? $label_language_values['appointments'] : 'Appointments'; ?></span>
+                                </a>
+                            </li>
+                            <li class="<?php if (strpos($_SERVER['SCRIPT_NAME'], 'staff-dashboard.php') !== false) { echo 'active'; } ?>">
+                                <a href="<?php echo SITE_URL; ?>staff/staff-dashboard.php#my-bookings" class="my-bookings" <?php if (strpos($_SERVER['SCRIPT_NAME'], 'staff-dashboard.php') !== false) { echo 'data-toggle="pill"'; } ?>>
+                                    <i class="fa fa-list"></i><span><?php echo $label_language_values['bookings']; ?></span>
                                 </a>
                             </li>
                             <li>
-                                <a href="#my-schedule" class="my-schedule" data-toggle="pill">
+                                <a href="<?php echo SITE_URL; ?>staff/staff-dashboard.php#my-schedule" class="my-schedule" <?php if (strpos($_SERVER['SCRIPT_NAME'], 'staff-dashboard.php') !== false) { echo 'data-toggle="pill"'; } ?>>
                                     <i class="fa fa-clock-o"></i><span><?php echo $label_language_values['schedule']; ?></span>
                                 </a>
                             </li>
@@ -688,6 +693,7 @@ else
 		var language_new ={'selected_language':'<?php echo substr($lang, strpos($lang,chr(0)), strpos($lang, "chr(_)")); ;?>'};
 		var ct_calendar_defaultView = 'month';
 		var ct_calendar_firstDay = '1';
+		var ct_doctor_calendar_readonly = <?php echo (strpos($_SERVER['SCRIPT_NAME'], 'appointments.php') !== false) ? 'true' : 'false'; ?>;
 		var titles ={
 			'selected_today':'<?php echo $label_language_values['calendar_today'];?>',
 			'selected_month':'<?php echo $label_language_values['calendar_month'];?>',

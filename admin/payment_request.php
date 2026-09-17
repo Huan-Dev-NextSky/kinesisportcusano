@@ -54,8 +54,8 @@ $decimal=$settings->get_option('ct_price_format_decimal_places');
           <thead>
           <tr>
             <th><?php echo "Request Id";  ?></th>
-            <th><?php echo "Staff Name";  ?></th>
-            <th><?php echo "Staff Email"; ?></th>
+            <th><?php echo "Doctor Name";  ?></th>
+            <th><?php echo "Doctor Email"; ?></th>
             <th><?php echo "Request Amount";  ?></th>
             <th><?php echo "Request Status";  ?></th>
             

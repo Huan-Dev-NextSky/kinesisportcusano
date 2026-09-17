@@ -61,9 +61,21 @@ if(is_numeric(strpos($timezonediff,'-'))){
 	$timediffmis = str_replace('+','',$timezonediff)*60;
 	$currDateTime_withTZ = strtotime("+".$timediffmis." minutes",strtotime(date('Y-m-d H:i:s')));
 }
-if(isset($_SESSION['ct_adminid'])) {	
+if(isset($_SESSION['ct_adminid']) || (isset($_SESSION['ct_staffid']) && !isset($_SESSION['ct_adminid'])) || (isset($_SESSION['ct_login_user_id']) && !isset($_SESSION['ct_adminid']) && !isset($_SESSION['ct_staffid']))) {	
 $start_date = $_GET["start"];
 $end_date = $_GET["end"];
+
+/* Doctor calendar: only own assignments */
+if (!isset($_SESSION['ct_adminid']) && isset($_SESSION['ct_staffid'])) {
+	$booking->provider_id = (int)$_SESSION['ct_staffid'];
+}
+
+/* Customer calendar: only own bookings */
+$is_customer_calendar = (!isset($_SESSION['ct_adminid']) && !isset($_SESSION['ct_staffid']) && isset($_SESSION['ct_login_user_id']));
+if ($is_customer_calendar) {
+	$booking->client_id = (int)$_SESSION['ct_login_user_id'];
+	$booking->provider_id = '';
+}
 
 if($time_format == 12){
 	$format= 'H:ia';
@@ -75,9 +87,9 @@ $appointment_array_for_cal = array();
 
 $all_db_gc_admin_ids = array();
 $all_db_gc_staff_ids = array();
-/** Get Google Calendar Bookings **/
+/** Get Google Calendar Bookings (Root Admin calendar only) **/
 $CalenderBooking = array();
-if($gc_hook->gc_purchase_status() == 'exist'){
+if(!$is_customer_calendar && isset($_SESSION['ct_adminid']) && $gc_hook->gc_purchase_status() == 'exist'){
 	$gc_hook->google_cal_TwoSync_admin_hook();
 	$all_gc_ids_result = $booking->get_all_gc_from_db();
 	if(mysqli_num_rows($all_gc_ids_result) > 0){
@@ -137,21 +149,19 @@ if($myarrbook->num_rows > 0){
 
         if($first_booking['client_id'] == 0){
             $gcn = $user->readoneguest($first_booking['order_id']);
-            $clientname = $gcn[2];
-            $clientphone = $gcn[4];
-            $clientemail = $gcn[3];
+            $clientname = isset($gcn[2]) ? $gcn[2] : '';
+            $clientphone = isset($gcn[4]) ? $gcn[4] : '';
+            $clientemail = isset($gcn[3]) ? $gcn[3] : '';
         } else {
             $user->user_id = $first_booking['client_id'];
             $cn = $user->readone();
-            if(isset($cn)){
-                $clientname = $cn[3] . " " . $cn[4];
-                $fetch_phone = strlen($cn[5]);
-                if($fetch_phone >= 6){
-                    $clientphone = $cn[5];
-                } else {
-                    $clientphone = '';
-                }
-                $clientemail = $cn[1];
+            if(isset($cn) && is_array($cn)){
+                $fname = isset($cn['first_name']) ? $cn['first_name'] : '';
+                $lname = isset($cn['last_name']) ? $cn['last_name'] : '';
+                $clientname = trim($fname . ' ' . $lname);
+                $phone = isset($cn['phone']) ? (string)$cn['phone'] : '';
+                $clientphone = (strlen($phone) >= 6) ? $phone : '';
+                $clientemail = isset($cn['user_email']) ? $cn['user_email'] : '';
             }
         }
 

@@ -526,10 +526,22 @@ if(isset($_POST['reschedulebooking'])){
 				@mysqli_query($conn, "UPDATE `ct_gcal_kinesis_sync` SET `event_start` = '{$finaldate}', `sync_status` = 'PENDING', `sync_action` = 'UPDATE', `last_sync_message` = 'Rescheduled by admin to {$finaldate}' WHERE `local_order_id` = " . (int)$order);
 
 				$serializedData = $objuserdetails->get_user_notes($order);
-				$data   = unserialize(base64_decode($serializedData[0]));
-				if(is_array($data) && array_key_exists('notes', $data)) {
-						$data['notes'] = $notes;
+				$rawNotes = (is_array($serializedData) && isset($serializedData[0])) ? $serializedData[0] : '';
+				$data = array();
+				if ($rawNotes !== '' && $rawNotes !== null) {
+					$decodedNotes = @base64_decode($rawNotes, true);
+					if ($decodedNotes === false) {
+						$decodedNotes = $rawNotes;
+					}
+					$parsedNotes = @unserialize($decodedNotes);
+					if ($parsedNotes === false) {
+						$parsedNotes = @unserialize($rawNotes);
+					}
+					if (is_array($parsedNotes)) {
+						$data = $parsedNotes;
+					}
 				}
+				$data['notes'] = $notes;
 				$serializedData = base64_encode(serialize($data));
 				$objuserdetails->update_notes($order,$serializedData);
 			}
@@ -2102,6 +2114,8 @@ if(isset($_POST['update_booking_users'])){
     /*SMS SENDING CODE END*/
     }
 
+	echo "1";
+	exit;
 }
 
 if(isset($_POST['insert_crm_user_detail'])){

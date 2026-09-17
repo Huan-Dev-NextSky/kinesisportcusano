@@ -162,7 +162,7 @@ function gc_settings_menu_content(){
 					$client->setClientSecret($GcclientSecret);
 					$client->setRedirectUri($ct_gc_admin_url);
 					$client->setDeveloperKey($ct_gc_api_key);
-					$client->setScopes(array('https://www.googleapis.com/auth/userinfo.email','https://www.googleapis.com/auth/calendar','https://www.google.com/calendar/feeds/'));
+					$client->setScopes(array('https://www.googleapis.com/auth/userinfo.email','https://www.googleapis.com/auth/calendar'));
 					$client->setAccessType('offline');
 					$client->setApprovalPrompt( 'force' );
 					
@@ -216,20 +216,7 @@ function gc_settings_menu_content(){
 												</div>
 											</td>
 										</tr>
-										<tr>
-											<td><label>".$label_language_values['Two_Way_Sync']."</label></td>
-											<td>
-												<div class='form-group'>
-													<label class='ctoggle-gc-sync_configure' for='gc-sync'>
-														<input class='cta-toggle-checkbox' data-toggle='toggle' data-size='small' type='checkbox'"; 
-														if($setting->get_option('ct_gc_status_sync_configure')=='Y'){	
-															$menu_content .= 'checked';
-														} 
-														$menu_content .= " id='ct-gc-status-sync-configure' data-onstyle='success' data-offstyle='danger' />
-													</label>
-												</div>
-											</td>
-										</tr>";
+										";
 										$syncDir = $setting->get_option('ct_gc_sync_direction') ?: 'two_way';
 										$menu_content .= "<tr>
 											<td><label>Sync Direction</label></td>
@@ -240,7 +227,7 @@ function gc_settings_menu_content(){
 														<option value='gcal_to_system' ".($syncDir == 'gcal_to_system' ? 'selected' : '').">One-Way Import (Google Calendar &rarr; System)</option>
 														<option value='system_to_gcal' ".($syncDir == 'system_to_gcal' ? 'selected' : '').">One-Way Export (System &rarr; Google Calendar)</option>
 													</select>
-													<a class='ct-tooltip-link' href='javascript:void(0)' data-toggle='tooltip' title='Choose synchronization direction between Google Calendar and the local system.'><i class='fa fa-info-circle fa-lg'></i></a>
+													<a class='ct-tooltip-link' href='javascript:void(0)' data-toggle='tooltip' title='Controls sync direction. Two-Way and Import also block busy Google Calendar slots when booking.'><i class='fa fa-info-circle fa-lg'></i></a>
 												</div>
 											</td>
 										</tr>";
@@ -250,7 +237,7 @@ function gc_settings_menu_content(){
 											<td>
 												<div class='form-group'>";
 												$authUrl = $client->createAuthUrl();
-												$menu_content .= "<a class='verify_gc_account' style='color:#1E8CBE' href='javascript:void(0)' data-hreflink=".$authUrl.">".$label_language_values['Verify_Account']."</a>
+												$menu_content .= "<a class='verify_gc_account' style='color:#1E8CBE' href='javascript:void(0)' data-hreflink='".htmlspecialchars($authUrl, ENT_QUOTES)."'>".$label_language_values['Verify_Account']."</a>
 												</div>
 											</td>
 										</tr>";
@@ -458,7 +445,7 @@ function gc_staff_settings_menu_content(){
 					$client->setClientSecret($GcclientSecret);
 					$client->setRedirectUri($ct_gc_admin_url);
 					$client->setDeveloperKey($ct_gc_api_key);
-					$client->setScopes(array('https://www.googleapis.com/auth/userinfo.email','https://www.googleapis.com/auth/calendar','https://www.google.com/calendar/feeds/'));
+					$client->setScopes(array('https://www.googleapis.com/auth/userinfo.email','https://www.googleapis.com/auth/calendar'));
 					$client->setAccessType('offline');
 					$client->setApprovalPrompt( 'force' );
 					
@@ -513,27 +500,14 @@ function gc_staff_settings_menu_content(){
 												</div>
 											</td>
 										</tr>
-										<tr>
-											<td><label>".$label_language_values['Two_Way_Sync']."</label></td>
-											<td>
-												<div class='form-group'>
-													<label class='ctoggle-gc-sync_configure' for='gc-sync'>
-														<input class='cta-toggle-checkbox' data-toggle='toggle' data-size='small' type='checkbox'"; 
-														if($setting->get_staff_option('gc_status_sync_configure',$_SESSION['ct_staffid'])=='Y'){	
-															$menu_content .= 'checked';
-														} 
-														$menu_content .= " id='ct-gc-status-sync-configure' data-onstyle='success' data-offstyle='danger' />
-													</label>
-												</div>
-											</td>
-										</tr>";
+										";
 										if(sizeof((array)$calenders)==0){
 										$menu_content .= "<tr>
 											<td><label></label></td>
 											<td>
 												<div class='form-group'>";
 												$authUrl = $client->createAuthUrl();
-												$menu_content .= "<a class='verify_gc_account' style='color:#1E8CBE' href='javascript:void(0)' data-hreflink=".$authUrl.">".$label_language_values['Verify_Account']."</a>
+												$menu_content .= "<a class='verify_gc_account' style='color:#1E8CBE' href='javascript:void(0)' data-hreflink='".htmlspecialchars($authUrl, ENT_QUOTES)."'>".$label_language_values['Verify_Account']."</a>
 												</div>
 											</td>
 										</tr>";
@@ -781,16 +755,9 @@ function gc_setting_configure_js() {
 		} else {
 			var ct_gc_status_configure = 'N';
 		}
-		var gc_sync_configure = jQuery('#ct-gc-status-sync-configure').prop('checked');
-		if(gc_sync_configure == true) {
-			var ct_gc_status_sync_configure = 'Y';
-		} else {
-			var ct_gc_status_sync_configure = 'N';
-		}
 		var ct_gc_sync_direction = jQuery('#ct_gc_sync_direction').val();
 		var datastring = {
 			ct_gc_status_configure: ct_gc_status_configure,
-			ct_gc_status_sync_configure: ct_gc_status_sync_configure,
 			ct_gc_sync_direction: ct_gc_sync_direction,
 			ct_gc_id: ct_gc_id,
 			'gc_setting_configure': 1
@@ -940,15 +907,8 @@ function gc_staff_setting_configure_js() {
 		} else {
 			var ct_gc_status_configure = 'N';
 		}
-		var gc_sync_configure = jQuery('#ct-gc-status-sync-configure').prop('checked');
-		if(gc_sync_configure == true) {
-			var ct_gc_status_sync_configure = 'Y';
-		} else {
-			var ct_gc_status_sync_configure = 'N';
-		}
 		var datastring = {
 			ct_gc_status_configure: ct_gc_status_configure,
-			ct_gc_status_sync_configure: ct_gc_status_sync_configure,
 			ct_gc_id: ct_gc_id,
 			'gc_staff_setting_configure': 1
 		};
@@ -968,14 +928,31 @@ function gc_staff_setting_configure_js() {
 	return $gc_settings_configure_js;
 }
 }
+if(!function_exists("gc_sync_reads_from_gcal")){
+function gc_sync_reads_from_gcal($settingObj) {
+	if (!$settingObj) {
+		return false;
+	}
+	$dir = $settingObj->get_option('ct_gc_sync_direction');
+	if ($dir === '' || $dir === null) {
+		$dir = 'two_way';
+	}
+	return ($dir === 'two_way' || $dir === 'gcal_to_system');
+}
+}
 if(!function_exists("gc_setting_configure_ajax")){
 function gc_setting_configure_ajax() {
 	global $setting;
 	if(isset($_POST['gc_setting_configure']) && $_POST['gc_setting_configure'] == '1') {
 		$ct_gc_id = $_POST['ct_gc_id'];
 		$ct_gc_status_configure = $_POST['ct_gc_status_configure'];
-		$ct_gc_status_sync_configure = $_POST['ct_gc_status_sync_configure'];
 		$ct_gc_sync_direction = isset($_POST['ct_gc_sync_direction']) ? $_POST['ct_gc_sync_direction'] : 'two_way';
+		$allowed_dirs = array('two_way', 'gcal_to_system', 'system_to_gcal');
+		if (!in_array($ct_gc_sync_direction, $allowed_dirs, true)) {
+			$ct_gc_sync_direction = 'two_way';
+		}
+		// Keep legacy flag in sync with Sync Direction (read-from-GCal modes).
+		$ct_gc_status_sync_configure = ($ct_gc_sync_direction === 'system_to_gcal') ? 'N' : 'Y';
 		$GC_id_configure = array(
 			'ct_gc_id'=>$ct_gc_id,
 			'ct_gc_status_configure'=>$ct_gc_status_configure,
@@ -994,7 +971,8 @@ function gc_staff_setting_configure_ajax() {
 	if(isset($_POST['gc_staff_setting_configure']) && $_POST['gc_staff_setting_configure'] == '1') {
 		$ct_gc_id = $_POST['ct_gc_id'];
 		$ct_gc_status_configure = $_POST['ct_gc_status_configure'];
-		$ct_gc_status_sync_configure = $_POST['ct_gc_status_sync_configure'];
+		// Staff follows admin Sync Direction for GCal busy-slot reads.
+		$ct_gc_status_sync_configure = gc_sync_reads_from_gcal($setting) ? 'Y' : 'N';
 		$GC_id_configure = array(
 			'gc_id'=>$ct_gc_id,
 			'gc_status_configure'=>$ct_gc_status_configure,
@@ -1607,17 +1585,9 @@ if(!function_exists("google_cal_TwoSync_ajax")){
 function google_cal_TwoSync_ajax(){
 	global $setting, $settings, $settings, $start_date, $staff_id, $providerCalenderBooking, $currDateTime_withTZ;
 	
-	if($setting != ""){
-		$adminTwoSync = $setting->get_option('ct_gc_status_sync_configure');
-	}
-	else{
-		$adminTwoSync = $settings->get_option('ct_gc_status_sync_configure');
-	}
-	if($staff_id != '' && $staff_id != '1'){
-		$providerTwoSync = $setting->get_staff_option('gc_status_sync_configure',$staff_id);
-	}else{
-		$providerTwoSync = 'N';
-	}
+	$settingObj = ($setting != "") ? $setting : $settings;
+	$adminTwoSync = gc_sync_reads_from_gcal($settingObj) ? 'Y' : 'N';
+	$providerTwoSync = ($staff_id != '' && $staff_id != '1' && $adminTwoSync == 'Y') ? 'Y' : 'N';
 	if($adminTwoSync=='Y'){
 		$curlevents = curl_init();
 		curl_setopt_array($curlevents, array(
@@ -1683,12 +1653,8 @@ function google_cal_TwoSync_ajax(){
 if(!function_exists("google_cal_TwoSync_admin_ajax")){
 function google_cal_TwoSync_admin_ajax(){
 	global $setting, $settings, $CalenderBooking, $start_date, $end_date, $currDateTime_withTZ;
-	if($setting != ""){
-		$adminTwoSync = $setting->get_option('ct_gc_status_sync_configure');
-	}
-	else{
-		$adminTwoSync = $settings->get_option('ct_gc_status_sync_configure');
-	}
+	$settingObj = ($setting != "") ? $setting : $settings;
+	$adminTwoSync = gc_sync_reads_from_gcal($settingObj) ? 'Y' : 'N';
 	if($adminTwoSync=='Y'){
 		$curlevents = curl_init();
 		curl_setopt_array($curlevents, array(
@@ -1729,12 +1695,8 @@ function google_cal_TwoSync_admin_ajax(){
 if(!function_exists("google_cal_TwoSync_one_event_admin_ajax")){
 function google_cal_TwoSync_one_event_admin_ajax(){
 	global $setting, $settings, $CalenderBooking, $event_id, $currDateTime_withTZ;
-	if($setting != ""){
-		$adminTwoSync = $setting->get_option('ct_gc_status_sync_configure');
-	}
-	else{
-		$adminTwoSync = $settings->get_option('ct_gc_status_sync_configure');
-	}
+	$settingObj = ($setting != "") ? $setting : $settings;
+	$adminTwoSync = gc_sync_reads_from_gcal($settingObj) ? 'Y' : 'N';
 	if($adminTwoSync=='Y'){
 		$curlevents = curl_init();
 		curl_setopt_array($curlevents, array(

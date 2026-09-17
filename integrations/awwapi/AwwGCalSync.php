@@ -82,6 +82,9 @@ class AwwGCalSync {
         $calService = $googleService['calService'];
         $calendarId = $this->setting->get_option('ct_gc_id');
         $systemTimezone = $this->setting->get_option('ct_timezone') ?: 'Europe/Rome';
+        if ($systemTimezone === '' || strtoupper($systemTimezone) === 'UTC') {
+            $systemTimezone = 'Europe/Rome';
+        }
 
         // 2. Compute date window
         $startDate = date('Y-m-d', strtotime("-{$daysPast} days"));
@@ -98,7 +101,7 @@ class AwwGCalSync {
                 'maxResults' => 500,
                 'showDeleted' => true
             ));
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $msg = 'Failed to fetch Google Calendar events: ' . $e->getMessage();
             $this->updateSyncStatus(false, $msg);
             return array(
@@ -174,8 +177,23 @@ class AwwGCalSync {
             $attendeeInfo = $this->extractAttendeeInfo($event);
             $parsedData = $this->parseEventContent($summary, $description, $attendeeInfo, $startDateTime, $endDateTime);
 
-            if ($existingBooking || $existingSync) {
-                // Event exists in System -> Check if time/content changed
+            if (empty($parsedData['service']) || empty($parsedData['service']['id'])) {
+                $errMsg = 'Sync error: Google event title "' . $summary . '" does not match any active service. Rename the title to a service name (e.g. Linfotecar). Booking was not created.';
+                $this->logGCalSyncFailure($gEventId, $parsedData, $errMsg, $existingSync);
+                $skippedCount++;
+                $errors[] = "Event {$gEventId}: {$errMsg}";
+                continue;
+            }
+
+            if ($existingBooking) {
+                // Event already has a local booking -> update if changed
+                $updateRes = $this->updateExistingBooking($existingBooking, $existingSync, $parsedData, $gEventId);
+                if ($updateRes['updated']) {
+                    $updatedCount++;
+                } else {
+                    $skippedCount++;
+                }
+            } elseif ($existingSync && !empty($existingSync['local_order_id']) && $existingSync['sync_status'] !== 'FAILED') {
                 $updateRes = $this->updateExistingBooking($existingBooking, $existingSync, $parsedData, $gEventId);
                 if ($updateRes['updated']) {
                     $updatedCount++;
@@ -183,15 +201,15 @@ class AwwGCalSync {
                     $skippedCount++;
                 }
             } else {
-                // New Event -> Create booking record in Local System DB
-                $createRes = $this->createNewBookingInSystem($parsedData, $gEventId);
+                // New event, or previous FAILED log only -> create booking in Local System
+                $createRes = $this->createNewBookingInSystem($parsedData, $gEventId, $existingSync);
                 if ($createRes['success']) {
                     $createdCount++;
                 } else {
+                    $errMsg = !empty($createRes['error']) ? $createRes['error'] : 'Failed to create local booking.';
+                    $this->logGCalSyncFailure($gEventId, $parsedData, 'Sync error: ' . $errMsg, $existingSync);
                     $skippedCount++;
-                    if (!empty($createRes['error'])) {
-                        $errors[] = "Event {$gEventId}: " . $createRes['error'];
-                    }
+                    $errors[] = "Event {$gEventId}: {$errMsg}";
                 }
             }
         }
@@ -208,6 +226,12 @@ class AwwGCalSync {
             $cancelledCount,
             $skippedCount
         );
+        if (!empty($errors)) {
+            $summaryMsg .= ' Errors: ' . implode(' | ', array_slice($errors, 0, 5));
+            if (count($errors) > 5) {
+                $summaryMsg .= ' …';
+            }
+        }
 
         $this->updateSyncStatus(true, $summaryMsg);
 
@@ -249,7 +273,8 @@ class AwwGCalSync {
             $client->setClientId($gcClientId);
             $client->setClientSecret($gcClientSecret);
             $client->setRedirectUri($gcAdminUrl);
-            $client->setDeveloperKey($gcApiKey);
+            // Do not setDeveloperKey here: HTTP-referrer-restricted API keys break
+            // server-side OAuth calls (referer is empty). Access token is enough.
             $client->setScopes('https://www.googleapis.com/auth/calendar');
             $client->setAccessType('offline');
 
@@ -260,7 +285,16 @@ class AwwGCalSync {
                 if (isset($tokenObj->refresh_token) && !empty($tokenObj->refresh_token)) {
                     $client->refreshToken($tokenObj->refresh_token);
                     $newAccessToken = $client->getAccessToken();
+                    if (empty($newAccessToken)) {
+                        return array('success' => false, 'message' => 'Google Calendar token expired and refresh returned empty token.');
+                    }
                     $this->setting->set_option('ct_gc_token', $newAccessToken);
+                    $client->setAccessToken($newAccessToken);
+                    if ($client->isAccessTokenExpired()) {
+                        return array('success' => false, 'message' => 'Google Calendar token still expired after refresh.');
+                    }
+                } else {
+                    return array('success' => false, 'message' => 'Google Calendar access token expired and no refresh_token is available. Please re-authorize Google Calendar.');
                 }
             }
 
@@ -350,58 +384,40 @@ class AwwGCalSync {
                     $notes .= ($notes ? "\n" : '') . $line;
                 }
             }
+        }
 
-            // Parse Summary if name or service is still generic
-            if (!empty($summary)) {
-                if (strpos($summary, '-') !== false) {
-                    $sumParts = explode('-', $summary, 2);
-                    $part1 = trim($sumParts[0]);
-                    $part2 = trim($sumParts[1]);
-
-                    $matchedService = $this->matchService($part2);
-                    if ($matchedService) {
-                        $serviceName = $matchedService['title'];
-                        $nameParts = explode(' ', $part1, 2);
-                        $firstName = isset($nameParts[0]) ? $nameParts[0] : 'Guest';
-                        $lastName = isset($nameParts[1]) ? $nameParts[1] : 'User';
-                    } else {
-                        $matchedService1 = $this->matchService($part1);
-                        if ($matchedService1) {
-                            $serviceName = $matchedService1['title'];
-                            $nameParts = explode(' ', $part2, 2);
-                            $firstName = isset($nameParts[0]) ? $nameParts[0] : 'Guest';
-                            $lastName = isset($nameParts[1]) ? $nameParts[1] : 'User';
-                        } else {
-                            $nameParts = explode(' ', $part1, 2);
-                            $firstName = isset($nameParts[0]) ? $nameParts[0] : 'Guest';
-                            $lastName = isset($nameParts[1]) ? $nameParts[1] : 'User';
-                        }
-                    }
-                } else {
-                    if ($firstName === 'Guest' && $lastName === 'User') {
-                        $nameParts = explode(' ', $summary, 2);
-                        $firstName = isset($nameParts[0]) ? $nameParts[0] : 'Guest';
-                        $lastName = isset($nameParts[1]) ? $nameParts[1] : 'User';
-                    }
+        // Summary = service title (primary). Customer name comes from description / attendees only.
+        if ($serviceName === '' && !empty($summary)) {
+            $serviceName = trim($summary);
+            // Legacy Cleanto title "Customer - Service": use the side that matches a service.
+            if (strpos($serviceName, '-') !== false) {
+                $sumParts = explode('-', $serviceName, 2);
+                $part1 = trim($sumParts[0]);
+                $part2 = trim($sumParts[1]);
+                if ($this->matchService($part2)) {
+                    $serviceName = $part2;
+                } elseif ($this->matchService($part1)) {
+                    $serviceName = $part1;
                 }
             }
         }
 
-        $serviceRecord = $this->matchService($serviceName);
-        if (!$serviceRecord) {
-            $serviceRecord = $this->getDefaultService();
+        // Customer name from attendee displayName when not set in description
+        if ($firstName === 'Guest' && $lastName === 'User' && !empty($attendeeInfo['name'])) {
+            $nameParts = explode(' ', trim($attendeeInfo['name']), 2);
+            $firstName = isset($nameParts[0]) && $nameParts[0] !== '' ? $nameParts[0] : 'Guest';
+            $lastName = isset($nameParts[1]) && $nameParts[1] !== '' ? $nameParts[1] : 'User';
         }
+
+        $serviceRecord = $this->matchService($serviceName);
+        // Do NOT fall back to a default service when summary is present but unmatched.
+        // Summary is the service name — no match means skip this event.
 
         $staffRecord = $this->matchStaff($staffName);
 
         if (empty($email)) {
-            $cleanFirst = preg_replace('/[^a-zA-Z0-9]/', '', strtolower($firstName));
-            $cleanLast = preg_replace('/[^a-zA-Z0-9]/', '', strtolower($lastName));
-            if (!empty($cleanFirst) && !empty($cleanLast)) {
-                $email = $cleanFirst . '.' . $cleanLast . '@kinesisport.it';
-            } else {
-                $email = 'client_' . substr(md5($summary . $startDateTime), 0, 8) . '@kinesisport.it';
-            }
+            /* Synthetic placeholder — never pretend to be a real @kinesisport.it mailbox */
+            $email = 'gcal.import.' . substr(md5($summary . $startDateTime), 0, 12) . '@noreply.local';
         }
 
         if (empty($phone)) {
@@ -430,7 +446,12 @@ class AwwGCalSync {
         if (empty($serviceName)) return null;
 
         $esc = mysqli_real_escape_string($this->conn, trim($serviceName));
-        $res = mysqli_query($this->conn, "SELECT `id`, `external_service_id`, `title`, `duration` FROM `ct_services` WHERE `title` LIKE '%{$esc}%' AND `status` = 'E' LIMIT 1");
+        // Prefer exact title match (case-insensitive), then partial.
+        $res = mysqli_query($this->conn, "SELECT `id`, `external_service_id`, `title`, `duration` FROM `ct_services` WHERE `status` = 'E' AND LOWER(`title`) = LOWER('{$esc}') LIMIT 1");
+        if ($res && mysqli_num_rows($res) > 0) {
+            return mysqli_fetch_assoc($res);
+        }
+        $res = mysqli_query($this->conn, "SELECT `id`, `external_service_id`, `title`, `duration` FROM `ct_services` WHERE `status` = 'E' AND `title` LIKE '%{$esc}%' LIMIT 1");
         if ($res && mysqli_num_rows($res) > 0) {
             return mysqli_fetch_assoc($res);
         }
@@ -449,7 +470,7 @@ class AwwGCalSync {
             'id' => 1,
             'external_service_id' => 1,
             'title' => 'General Appointment',
-            'duration' => '01:00:00'
+            'duration' => 60
         );
     }
 
@@ -459,22 +480,56 @@ class AwwGCalSync {
     private function matchStaff($staffName) {
         if (!empty($staffName)) {
             $esc = mysqli_real_escape_string($this->conn, trim($staffName));
-            $res = mysqli_query($this->conn, "SELECT `id`, `fullname`, `email` FROM `ct_admin_info` WHERE `fullname` LIKE '%{$esc}%' LIMIT 1");
+            $res = mysqli_query($this->conn, "SELECT `id`, `fullname`, `email`, `external_employee_id` FROM `ct_admin_info` WHERE `role` != 'admin' AND `enable_booking` = 'Y' AND `fullname` LIKE '%{$esc}%' LIMIT 1");
+            if ($res && mysqli_num_rows($res) > 0) {
+                return mysqli_fetch_assoc($res);
+            }
+            $res = mysqli_query($this->conn, "SELECT `id`, `fullname`, `email`, `external_employee_id` FROM `ct_admin_info` WHERE `role` != 'admin' AND `fullname` LIKE '%{$esc}%' LIMIT 1");
             if ($res && mysqli_num_rows($res) > 0) {
                 return mysqli_fetch_assoc($res);
             }
         }
-        $res = mysqli_query($this->conn, "SELECT `id`, `fullname`, `email` FROM `ct_admin_info` WHERE `enable_booking` = 'Y' LIMIT 1");
+        $res = mysqli_query($this->conn, "SELECT `id`, `fullname`, `email`, `external_employee_id` FROM `ct_admin_info` WHERE `role` != 'admin' AND `enable_booking` = 'Y' AND `external_employee_id` IS NOT NULL AND `external_employee_id` != 0 ORDER BY `id` ASC LIMIT 1");
         if ($res && mysqli_num_rows($res) > 0) {
             return mysqli_fetch_assoc($res);
         }
-        return array('id' => 1, 'fullname' => 'Admin', 'email' => '');
+        $res = mysqli_query($this->conn, "SELECT `id`, `fullname`, `email`, `external_employee_id` FROM `ct_admin_info` WHERE `role` != 'admin' AND `enable_booking` = 'Y' ORDER BY `id` ASC LIMIT 1");
+        if ($res && mysqli_num_rows($res) > 0) {
+            return mysqli_fetch_assoc($res);
+        }
+        return array('id' => 1, 'fullname' => 'Admin', 'email' => '', 'external_employee_id' => null);
+    }
+
+    /**
+     * Resolve order duration in minutes from event times or service record
+     */
+    private function resolveOrderDurationMinutes($parsed) {
+        $startTs = !empty($parsed['startDateTime']) ? strtotime($parsed['startDateTime']) : false;
+        $endTs = !empty($parsed['endDateTime']) ? strtotime($parsed['endDateTime']) : false;
+        if ($startTs && $endTs && $endTs > $startTs) {
+            $mins = (int)round(($endTs - $startTs) / 60);
+            if ($mins > 0 && $mins <= 24 * 60) {
+                return $mins;
+            }
+        }
+        if (!empty($parsed['service']['duration'])) {
+            $dur = trim((string)$parsed['service']['duration']);
+            if (preg_match('/^(\d+):(\d+)(?::(\d+))?$/', $dur, $dm)) {
+                $mins = ((int)$dm[1]) * 60 + (int)$dm[2];
+                if ($mins > 0) {
+                    return $mins;
+                }
+            } elseif (is_numeric($dur) && (int)$dur > 0) {
+                return (int)$dur;
+            }
+        }
+        return 60;
     }
 
     /**
      * Create New Booking inside Local System Database
      */
-    private function createNewBookingInSystem($parsed, $gEventId) {
+    private function createNewBookingInSystem($parsed, $gEventId, $existingSync = null) {
         // 1. Find or create ct_users record
         $userId = $this->getOrCreateUser($parsed);
         if (!$userId) {
@@ -491,6 +546,10 @@ class AwwGCalSync {
         $serviceId = (int)$parsed['service']['id'];
         $staffId = (int)$parsed['staff']['id'];
         $escGEventId = mysqli_real_escape_string($this->conn, $gEventId);
+        $orderDuration = (int)$this->resolveOrderDurationMinutes($parsed);
+        if ($orderDuration <= 0) {
+            $orderDuration = 60;
+        }
 
         // 3. Insert into ct_bookings (kinesis_sync_status is set to PENDING for Step 2)
         $insertBooking = "INSERT INTO `ct_bookings` (
@@ -530,7 +589,7 @@ class AwwGCalSync {
         $insertClient = "INSERT INTO `ct_order_client_info` (
             `id`, `order_id`, `client_name`, `client_email`, `client_phone`, `client_personal_info`, `order_duration`, `recurring_id`
         ) VALUES (
-            NULL, '{$nextOrderId}', '{$clientName}', '{$clientEmail}', '{$clientPhone}', '{$personalInfo}', '60', '0'
+            NULL, '{$nextOrderId}', '{$clientName}', '{$clientEmail}', '{$clientPhone}', '{$personalInfo}', '{$orderDuration}', '0'
         )";
         mysqli_query($this->conn, $insertClient);
 
@@ -546,29 +605,100 @@ class AwwGCalSync {
         )";
         mysqli_query($this->conn, $insertPayment);
 
-        // 6. Insert mapping record into ct_gcal_kinesis_sync
+        // 6. Insert or upgrade mapping record into ct_gcal_kinesis_sync
         $escSummary = mysqli_real_escape_string($this->conn, $parsed['summary']);
         $escStart = mysqli_real_escape_string($this->conn, $parsed['startDateTime']);
         $escEnd = mysqli_real_escape_string($this->conn, $parsed['endDateTime']);
         $escDob = mysqli_real_escape_string($this->conn, $parsed['dob']);
         $extServiceId = !empty($parsed['service']['external_service_id']) ? (int)$parsed['service']['external_service_id'] : (int)$serviceId;
+        $successMsg = 'Imported to local system from Google Calendar';
 
-        $insertSync = "INSERT INTO `ct_gcal_kinesis_sync` (
-            `google_event_id`, `local_order_id`, `local_booking_id`, `kinesis_customer_id`, `kinesis_appointment_id`,
-            `event_summary`, `event_start`, `event_end`, `customer_email`, `customer_phone`, `customer_name`, `customer_dob`,
-            `service_id`, `employee_id`, `sync_status`, `sync_action`, `last_sync_message`, `created_at`, `updated_at`
-        ) VALUES (
-            '{$escGEventId}', '{$nextOrderId}', '{$localBookingId}', NULL, NULL,
-            '{$escSummary}', '{$escStart}', '{$escEnd}', '{$clientEmail}', '{$clientPhone}', '{$clientName}', '{$escDob}',
-            '{$extServiceId}', '{$staffId}', 'PENDING', 'CREATE', 'Imported to local system from Google Calendar', '{$currentTime}', '{$currentTime}'
-        )";
-        mysqli_query($this->conn, $insertSync);
+        if ($existingSync && !empty($existingSync['id'])) {
+            $syncId = (int)$existingSync['id'];
+            mysqli_query($this->conn, "UPDATE `ct_gcal_kinesis_sync` SET
+                `local_order_id` = '{$nextOrderId}',
+                `local_booking_id` = '{$localBookingId}',
+                `event_summary` = '{$escSummary}',
+                `event_start` = '{$escStart}',
+                `event_end` = '{$escEnd}',
+                `customer_email` = '{$clientEmail}',
+                `customer_phone` = '{$clientPhone}',
+                `customer_name` = '{$clientName}',
+                `customer_dob` = '{$escDob}',
+                `service_id` = '{$extServiceId}',
+                `employee_id` = '{$staffId}',
+                `sync_status` = 'PENDING',
+                `sync_action` = 'CREATE',
+                `last_sync_message` = '{$successMsg}',
+                `updated_at` = '{$currentTime}'
+                WHERE `id` = {$syncId}");
+        } else {
+            $insertSync = "INSERT INTO `ct_gcal_kinesis_sync` (
+                `google_event_id`, `local_order_id`, `local_booking_id`, `kinesis_customer_id`, `kinesis_appointment_id`,
+                `event_summary`, `event_start`, `event_end`, `customer_email`, `customer_phone`, `customer_name`, `customer_dob`,
+                `service_id`, `employee_id`, `sync_status`, `sync_action`, `last_sync_message`, `created_at`, `updated_at`
+            ) VALUES (
+                '{$escGEventId}', '{$nextOrderId}', '{$localBookingId}', NULL, NULL,
+                '{$escSummary}', '{$escStart}', '{$escEnd}', '{$clientEmail}', '{$clientPhone}', '{$clientName}', '{$escDob}',
+                '{$extServiceId}', '{$staffId}', 'PENDING', 'CREATE', '{$successMsg}', '{$currentTime}', '{$currentTime}'
+            )";
+            mysqli_query($this->conn, $insertSync);
+        }
 
         return array(
             'success' => true,
             'order_id' => $nextOrderId,
             'booking_id' => $localBookingId
         );
+    }
+
+    /**
+     * Log a GCal import failure into sync history without creating a local booking.
+     */
+    private function logGCalSyncFailure($gEventId, $parsed, $message, $existingSync = null) {
+        $currentTime = date('Y-m-d H:i:s');
+        $escGEventId = mysqli_real_escape_string($this->conn, $gEventId);
+        $escSummary = mysqli_real_escape_string($this->conn, isset($parsed['summary']) ? $parsed['summary'] : '');
+        $escStart = mysqli_real_escape_string($this->conn, isset($parsed['startDateTime']) ? $parsed['startDateTime'] : '');
+        $escEnd = mysqli_real_escape_string($this->conn, isset($parsed['endDateTime']) ? $parsed['endDateTime'] : '');
+        $escEmail = mysqli_real_escape_string($this->conn, isset($parsed['email']) ? $parsed['email'] : '');
+        $escPhone = mysqli_real_escape_string($this->conn, isset($parsed['phone']) ? $parsed['phone'] : '');
+        $custName = trim((isset($parsed['firstName']) ? $parsed['firstName'] : '') . ' ' . (isset($parsed['lastName']) ? $parsed['lastName'] : ''));
+        $escName = mysqli_real_escape_string($this->conn, $custName);
+        $escMsg = mysqli_real_escape_string($this->conn, $message);
+        $staffId = (!empty($parsed['staff']['id']) && !empty($parsed['service']['id'])) ? (int)$parsed['staff']['id'] : 'NULL';
+
+        if ($existingSync && !empty($existingSync['id'])) {
+            // Keep FAILED log only — do not attach to a booking
+            $syncId = (int)$existingSync['id'];
+            mysqli_query($this->conn, "UPDATE `ct_gcal_kinesis_sync` SET
+                `event_summary` = '{$escSummary}',
+                `event_start` = '{$escStart}',
+                `event_end` = '{$escEnd}',
+                `customer_email` = '{$escEmail}',
+                `customer_phone` = '{$escPhone}',
+                `customer_name` = '{$escName}',
+                `service_id` = NULL,
+                `employee_id` = {$staffId},
+                `local_order_id` = NULL,
+                `local_booking_id` = NULL,
+                `sync_status` = 'FAILED',
+                `sync_action` = 'CREATE',
+                `last_sync_message` = '{$escMsg}',
+                `updated_at` = '{$currentTime}'
+                WHERE `id` = {$syncId}");
+            return;
+        }
+
+        mysqli_query($this->conn, "INSERT INTO `ct_gcal_kinesis_sync` (
+            `google_event_id`, `local_order_id`, `local_booking_id`, `kinesis_customer_id`, `kinesis_appointment_id`,
+            `event_summary`, `event_start`, `event_end`, `customer_email`, `customer_phone`, `customer_name`, `customer_dob`,
+            `service_id`, `employee_id`, `sync_status`, `sync_action`, `last_sync_message`, `created_at`, `updated_at`
+        ) VALUES (
+            '{$escGEventId}', NULL, NULL, NULL, NULL,
+            '{$escSummary}', '{$escStart}', '{$escEnd}', '{$escEmail}', '{$escPhone}', '{$escName}', '1990-01-01',
+            NULL, {$staffId}, 'FAILED', 'CREATE', '{$escMsg}', '{$currentTime}', '{$currentTime}'
+        )");
     }
 
     /**
@@ -587,9 +717,12 @@ class AwwGCalSync {
             $escEnd = mysqli_real_escape_string($this->conn, $newEnd);
             $escGEventId = mysqli_real_escape_string($this->conn, $gEventId);
 
-            // Update ct_bookings with UPDATE_PENDING status
+            // Only mark UPDATE_PENDING if this booking already exists on Kinesis.
+            // Otherwise keep PENDING so Step 2 can CREATE it.
             if ($existingBooking) {
-                mysqli_query($this->conn, "UPDATE `ct_bookings` SET `booking_date_time` = '{$escStart}', `lastmodify` = '{$currentTime}', `kinesis_sync_status` = 'UPDATE_PENDING' WHERE `id` = " . (int)$existingBooking['id']);
+                $alreadyOnKinesis = !empty($existingBooking['kinesis_appointment_id']);
+                $nextStatus = $alreadyOnKinesis ? 'UPDATE_PENDING' : 'PENDING';
+                mysqli_query($this->conn, "UPDATE `ct_bookings` SET `booking_date_time` = '{$escStart}', `lastmodify` = '{$currentTime}', `kinesis_sync_status` = '{$nextStatus}' WHERE `id` = " . (int)$existingBooking['id']);
             }
 
             // Update ct_gcal_kinesis_sync

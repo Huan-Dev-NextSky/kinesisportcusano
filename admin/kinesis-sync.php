@@ -613,7 +613,10 @@ jQuery(document).ready(function ($) {
           var custEmail = row.customer_email || '';
           var custPhone = row.customer_phone || '';
           var apptDate = row.event_start || row.booking_date_time || '-';
-          var serviceName = row.service_name || row.event_summary || 'Service';
+          var serviceName = row.service_name || '';
+          if (!serviceName) {
+            serviceName = (row.sync_status === 'FAILED') ? '—' : (row.event_summary || '—');
+          }
           var staffName = row.staff_name ? ('<br /><small class="text-muted"><i class="fa fa-user-md"></i> ' + row.staff_name + '</small>') : '';
 
           var gcalBadge = '<span class="text-muted">-</span>';

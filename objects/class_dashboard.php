@@ -7,7 +7,8 @@ class cleanto_dashboard{
         public $conn;
         public function getclient($id)
         {
-            $query = "SELECT * FROM `ct_users` WHERE `id` = $id";
+            /* Explicit column order — external_customer_id must not sit at index 1 */
+            $query = "SELECT `id`, `user_email`, `user_pwd`, `first_name`, `last_name`, `phone`, `zip`, `address`, `city`, `state`, `notes`, `vc_status`, `p_status`, `contact_status`, `status`, `usertype`, `cus_dt`, `stripe_id`, `referal_code`, `wallet_amount`, `external_customer_id`, `dob`, `sms_opt_in` FROM `ct_users` WHERE `id` = $id";
             $result=mysqli_query($this->conn,$query);
 			if(!empty($result)){
 				$value=mysqli_fetch_row($result);
@@ -85,21 +86,26 @@ class cleanto_dashboard{
         /*  delete the booking */
         public function delete_booking($orderid)
         {
+            $orderid = (int)$orderid;
+            if ($orderid <= 0) {
+                return false;
+            }
             /* ct_staff_commission */
             $query5 = "delete from `ct_staff_commission` where `order_id`='".$orderid."'";
-            $result5=mysqli_query($this->conn,$query5);
+            mysqli_query($this->conn,$query5);
             /* bookings */
             $query1 = "delete from `ct_bookings` where `order_id`='".$orderid."'";
             $result=mysqli_query($this->conn,$query1);
             /* booking_addons */
             $query2 = "delete from `ct_booking_addons` where `order_id`='".$orderid."'";
-            $result=mysqli_query($this->conn,$query2);
+            mysqli_query($this->conn,$query2);
             /* payments */
             $query3 = "delete from `ct_payments` where `order_id`='".$orderid."'";
-            $result=mysqli_query($this->conn,$query3);
+            mysqli_query($this->conn,$query3);
             /* order_client_info */
             $query4 = "delete from `ct_order_client_info` where `order_id`='".$orderid."'";
-            $result=mysqli_query($this->conn,$query4);
+            mysqli_query($this->conn,$query4);
+            return (bool)$result;
         }
         public function delete_recurring_booking($recurring_id1)
         {

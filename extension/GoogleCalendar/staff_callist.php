@@ -21,7 +21,7 @@ require_once 'google-api-php-client/src/contrib/Google_CalendarService.php';
 		
 		$client->setRedirectUri($ct_gc_admin_url);
 		$client->setDeveloperKey($ct_gc_api_key);
-		$client->setScopes(array('https://www.googleapis.com/auth/userinfo.email','https://www.googleapis.com/auth/calendar','https://www.google.com/calendar/feeds/'));
+		$client->setScopes(array('https://www.googleapis.com/auth/userinfo.email','https://www.googleapis.com/auth/calendar'));
 		$client->setAccessType('offline');
 		$client->setApprovalPrompt( 'force' );
 		

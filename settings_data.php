@@ -127,7 +127,7 @@ if(isset($_GET['date']) && $_GET['date'] != ""){
 								  $name = "Admin Email Notification";
 								  if($ress[1] == "Y"){ $status = "Yes";}else{ $status = "No"; }
 								}elseif($ress[0] == "ct_staff_email_notification_status"){
-								  $name = "Staff Email Notification";
+								  $name = "Doctor Email Notification";
 								  if($ress[1] == "Y"){ $status = "Yes";}else{ $status = "No"; }
 								}elseif($ress[0] == "ct_client_email_notification_status"){
 								  $name = "Client Email Notification";

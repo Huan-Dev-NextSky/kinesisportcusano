@@ -41,7 +41,8 @@ class cleanto_adminprofile {
 
 	/*Function for Read Only one data matched with Id*/
 	public function readone(){
-		$query="select * from `".$this->tablename."` where `id`='".$this->id."'";
+		/* Legacy numeric: [11]=description [16]=image [17]=service_ids — external_employee_id last */
+		$query="select `id`, `password`, `email`, `fullname`, `phone`, `address`, `city`, `state`, `zip`, `country`, `role`, `description`, `enable_booking`, `service_commission`, `commision_value`, `schedule_type`, `image`, `service_ids`, `staff_wallet_amount`, `paypal_api_username`, `paypal_api_password`, `paypal_api_signature`, `paypal_test_mode_status`, `revenue_percentage`, `latitude`, `longitude`, `external_employee_id` from `".$this->tablename."` where `id`='".$this->id."'";
 		$result=mysqli_query($this->conn,$query);
 		$value=mysqli_fetch_array($result);
 		return $value;
@@ -105,13 +106,13 @@ class cleanto_adminprofile {
 	
 	/*  display all staff in staff page in admin pane  */
 	public function readall_staff(){
-		$query = "select * from `".$this->tablename."` where `role` != 'admin'";
+		$query = "select `id`, `password`, `email`, `fullname`, `phone`, `address`, `city`, `state`, `zip`, `country`, `role`, `description`, `enable_booking`, `service_commission`, `commision_value`, `schedule_type`, `image`, `service_ids`, `staff_wallet_amount`, `paypal_api_username`, `paypal_api_password`, `paypal_api_signature`, `paypal_test_mode_status`, `revenue_percentage`, `latitude`, `longitude`, `external_employee_id` from `".$this->tablename."` where `role` != 'admin'";
 		$result = mysqli_query($this->conn,$query);
 		return $result;
 	}
 	/*  display all staff available for booking  */
 	public function readall_staff_booking(){
-		$query  = "select * from `".$this->tablename."` where `role` != 'admin' and `enable_booking` = 'Y'";
+		$query  = "select `id`, `password`, `email`, `fullname`, `phone`, `address`, `city`, `state`, `zip`, `country`, `role`, `description`, `enable_booking`, `service_commission`, `commision_value`, `schedule_type`, `image`, `service_ids`, `staff_wallet_amount`, `paypal_api_username`, `paypal_api_password`, `paypal_api_signature`, `paypal_test_mode_status`, `revenue_percentage`, `latitude`, `longitude`, `external_employee_id` from `".$this->tablename."` where `role` != 'admin' and `enable_booking` = 'Y'";
 		$result=mysqli_query($this->conn,$query);
 		return $result;
 	}

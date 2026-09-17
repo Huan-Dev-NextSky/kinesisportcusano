@@ -131,6 +131,7 @@
 	var errorobj_rescheduled = "<?php echo $label_language_values['rescheduled']; ?>";
 	var errorobj_calcelled_by_client = "<?php echo $label_language_values['cancelled_by_client']; ?>";
 	var errorobj_appointment_completed = "<?php echo $label_language_values['appointment_completed']; ?>";
+	var errorobj_completed = "<?php echo $label_language_values['completed']; ?>";
 	var errorobj_schedule_updated_to_monthly = "<?php echo $label_language_values['schedule_updated_to_monthly']; ?>";
 	var errorobj_schedule_updated_to_weekly = "<?php echo $label_language_values['schedule_updated_to_weekly']; ?>";
 	var errorobj_sorry_method_already_exist = "<?php echo $label_language_values['sorry_method_already_exist']; ?>";

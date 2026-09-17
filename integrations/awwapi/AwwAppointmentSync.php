@@ -96,7 +96,7 @@ class AwwAppointmentSync {
                   LEFT JOIN ct_users u ON b.client_id = u.id
                   WHERE (
                     (b.kinesis_appointment_id IS NULL OR b.kinesis_appointment_id = 0)
-                    AND IFNULL(b.kinesis_sync_status, 'PENDING') = 'PENDING'
+                    AND IFNULL(b.kinesis_sync_status, 'PENDING') IN ('PENDING', 'UPDATE_PENDING')
                     AND b.booking_status NOT IN ('CC', 'CS', 'R')
                   )
                   OR (
@@ -260,12 +260,13 @@ class AwwAppointmentSync {
             return array('success' => true, 'action' => 'CANCEL', 'note' => 'No active Kinesis appointment to cancel.');
         }
 
-        // Stuck UPDATE_PENDING without remote ids — never fall through to CREATE
+        // UPDATE_PENDING with no remote ids = never pushed to Kinesis yet (e.g. GCal
+        // import then time change). Treat as CREATE instead of blocking.
         if ($row['kinesis_sync_status'] === 'UPDATE_PENDING') {
             if (empty($row['kinesis_appointment_id']) || empty($row['kinesis_customer_id'])) {
-                return array('success' => false, 'action' => 'UPDATE', 'error' => 'UPDATE_PENDING but missing Kinesis appointment/customer ids; refused CREATE fallback.');
-            }
-            $isoDateTime = date('c', strtotime($row['booking_date_time']));
+                $row['kinesis_sync_status'] = 'PENDING';
+            } else {
+            $isoDateTime = $this->toKinesisDateTime($row['booking_date_time']);
             $employeeId = $this->resolveExternalEmployeeId($row['staff_ids']);
             if ($employeeId === null) {
                 return array('success' => false, 'action' => 'UPDATE', 'error' => 'Missing external_employee_id for assigned doctor; refuse using local staff id.');
@@ -282,9 +283,9 @@ class AwwAppointmentSync {
                 mysqli_query($this->conn, "UPDATE `ct_bookings` SET `kinesis_sync_status` = 'SYNCED', `kinesis_sync_time` = '{$currentTime}' WHERE `order_id` = '{$orderId}'");
                 mysqli_query($this->conn, "UPDATE `ct_gcal_kinesis_sync` SET `sync_status` = 'SYNCED', `sync_action` = 'UPDATE', `last_sync_message` = 'Updated on Kinesis API', `updated_at` = '{$currentTime}' WHERE `local_order_id` = '{$orderId}'");
                 return array('success' => true, 'action' => 'UPDATE', 'appointmentId' => $row['kinesis_appointment_id']);
-            } else {
-                $errMsg = isset($patchRes['error']) ? $patchRes['error'] : 'Failed to patch appointment on Kinesis API';
-                return array('success' => false, 'action' => 'UPDATE', 'error' => $errMsg);
+            }
+            $errMsg = isset($patchRes['error']) ? $patchRes['error'] : 'Failed to patch appointment on Kinesis API';
+            return array('success' => false, 'action' => 'UPDATE', 'error' => $errMsg);
             }
         }
 
@@ -292,7 +293,7 @@ class AwwAppointmentSync {
         if (empty($row['external_service_id'])) {
             return array('success' => false, 'action' => 'CREATE', 'error' => 'Missing external_service_id; refuse using local service id on Kinesis API.');
         }
-        $isoDateTime = date('c', strtotime($row['booking_date_time']));
+        $isoDateTime = $this->toKinesisDateTime($row['booking_date_time']);
         $extServiceId = (int)$row['external_service_id'];
 
         $employeeId = $this->resolveExternalEmployeeId($row['staff_ids']);
@@ -304,6 +305,12 @@ class AwwAppointmentSync {
         $customer = $this->resolveCustomerDetails($row);
         if (empty($row['client_email']) && empty($row['user_email'])) {
             return array('success' => false, 'action' => 'CREATE', 'error' => 'Missing customer email; refuse creating Kinesis appointment with synthetic address.');
+        }
+
+        // Pre-check availability to return a clearer error than raw Italian API conflict.
+        $availabilityHint = $this->explainOutsideWorkingHours($extServiceId, $employeeId, $row['booking_date_time'], $isoDateTime);
+        if ($availabilityHint !== null) {
+            return array('success' => false, 'action' => 'CREATE', 'error' => $availabilityHint);
         }
 
         // 1. Search if customer exists in Kinesis API
@@ -376,6 +383,11 @@ class AwwAppointmentSync {
             $escName = mysqli_real_escape_string($this->conn, $customer['firstName'] . ' ' . $customer['lastName']);
             $escStart = mysqli_real_escape_string($this->conn, $row['booking_date_time']);
             $gEventId = mysqli_real_escape_string($this->conn, $row['gc_event_id']);
+            $localStaffId = 0;
+            if (!empty($row['staff_ids'])) {
+                $parts = explode(',', (string)$row['staff_ids']);
+                $localStaffId = (int)trim($parts[0]);
+            }
 
             mysqli_query($this->conn, "INSERT INTO `ct_gcal_kinesis_sync` (
                 `google_event_id`, `local_order_id`, `local_booking_id`, `kinesis_customer_id`, `kinesis_appointment_id`,
@@ -384,7 +396,7 @@ class AwwAppointmentSync {
             ) VALUES (
                 '{$gEventId}', '{$orderId}', '{$bookingId}', {$custVal}, {$apptVal},
                 '{$escSummary}', '{$escStart}', '{$escEmail}', '{$escPhone}', '{$escName}', '1990-01-01',
-                '{$extServiceId}', '{$employeeId}', 'SYNCED', 'CREATE', 'Synced from Local System to Kinesis API', '{$currentTime}', '{$currentTime}'
+                '{$extServiceId}', '{$localStaffId}', 'SYNCED', 'CREATE', 'Synced from Local System to Kinesis API', '{$currentTime}', '{$currentTime}'
             )");
         }
 
@@ -394,6 +406,71 @@ class AwwAppointmentSync {
             'appointmentId' => $kinesisApptId,
             'customerId' => $kinesisCustomerId
         );
+    }
+
+    /**
+     * Build ISO-8601 datetime for Kinesis using clinic timezone.
+     * Local booking_date_time is wall-clock time (from GCal/admin), not UTC.
+     */
+    private function toKinesisDateTime($bookingDateTime) {
+        $tzName = $this->setting->get_option('ct_timezone');
+        if ($tzName === '' || $tzName === null || strtoupper($tzName) === 'UTC') {
+            $tzName = 'Europe/Rome';
+        }
+        try {
+            $tz = new DateTimeZone($tzName);
+        } catch (Exception $e) {
+            $tz = new DateTimeZone('Europe/Rome');
+        }
+        $dt = DateTime::createFromFormat('Y-m-d H:i:s', $bookingDateTime, $tz);
+        if (!$dt) {
+            $dt = new DateTime($bookingDateTime, $tz);
+        }
+        return $dt->format('c');
+    }
+
+    /**
+     * If requested slot is not in Kinesis availability, return human-readable error.
+     * Returns null when slot looks available (or availability API failed — let create proceed).
+     */
+    private function explainOutsideWorkingHours($serviceId, $employeeId, $bookingDateTime, $isoDateTime) {
+        try {
+            $tzName = 'Europe/Rome';
+            $tz = new DateTimeZone($tzName);
+            $dt = DateTime::createFromFormat('Y-m-d H:i:s', $bookingDateTime, $tz);
+            if (!$dt) {
+                $dt = new DateTime($bookingDateTime, $tz);
+            }
+            $dayStart = $dt->format('Y-m-d') . 'T00:00:00' . $dt->format('P');
+            $dayEnd = $dt->format('Y-m-d') . 'T23:59:59' . $dt->format('P');
+            $av = $this->apiClient->getAvailability((int)$serviceId, $dayStart, $dayEnd, (int)$employeeId);
+            if (empty($av['success']) || !is_array($av['data'])) {
+                return null;
+            }
+            $wanted = $dt->format('Y-m-d\TH:i');
+            foreach ($av['data'] as $slot) {
+                if (empty($slot['dateTime'])) {
+                    continue;
+                }
+                $slotDt = new DateTime($slot['dateTime']);
+                if ($slotDt->format('Y-m-d\TH:i') === $wanted) {
+                    return null;
+                }
+            }
+            $slotSamples = array();
+            foreach (array_slice($av['data'], 0, 8) as $slot) {
+                if (!empty($slot['dateTime'])) {
+                    $slotSamples[] = (new DateTime($slot['dateTime']))->format('H:i');
+                }
+            }
+            $dayLabel = $dt->format('l Y-m-d');
+            if (count($av['data']) === 0) {
+                return "Kinesis rejected {$isoDateTime}: employee #{$employeeId} has no available slots on {$dayLabel}. Update Google Calendar / booking time, or set working hours for this professional in Kinesis.";
+            }
+            return "Kinesis rejected {$isoDateTime}: outside professional working hours on {$dayLabel}. Available that day: " . implode(', ', $slotSamples) . (count($av['data']) > 8 ? ', ...' : '') . '.';
+        } catch (Exception $e) {
+            return null;
+        }
     }
 
     /**

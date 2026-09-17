@@ -8,6 +8,8 @@ class cleanto_services{
 	public $image;
 	public $status;
 	public $position;
+	public $price = 0;
+	public $duration = 0;
 	public $tablename="ct_services";
 	public $table_name="ct_setting_design";
 	public $table_name_sa="ct_services_addon";
@@ -17,17 +19,108 @@ class cleanto_services{
 	public $table_name_smd="ct_service_methods_design";
 	public $table_name_sar="ct_addon_service_rate";
 	public $conn;
+
+	/** Convert duration values (minutes int OR HH:MM:SS / HH:MM) to minutes. */
+	public static function duration_to_minutes($value){
+		if ($value === null || $value === '') {
+			return 0;
+		}
+		if (is_numeric($value) && strpos((string)$value, ':') === false) {
+			return max(0, (int)$value);
+		}
+		$str = trim((string)$value);
+		if (preg_match('/^(\d+):(\d{1,2})(?::(\d{1,2}))?$/', $str, $m)) {
+			$h = (int)$m[1];
+			$min = (int)$m[2];
+			$sec = isset($m[3]) ? (int)$m[3] : 0;
+			return max(0, ($h * 60) + $min + (int)round($sec / 60));
+		}
+		return max(0, (int)$str);
+	}
+
+	/** Ensure price/duration columns exist; migrate VARCHAR HH:MM:SS duration to INT minutes. */
+	public function ensure_price_duration_schema(){
+		$cols = array();
+		$res = mysqli_query($this->conn, "SHOW COLUMNS FROM `".$this->tablename."`");
+		if ($res) {
+			while ($row = mysqli_fetch_assoc($res)) {
+				$cols[$row['Field']] = $row;
+			}
+		}
+		if (!isset($cols['price'])) {
+			mysqli_query($this->conn, "ALTER TABLE `".$this->tablename."` ADD `price` DOUBLE NOT NULL DEFAULT '0' AFTER `image`");
+		}
+		if (!isset($cols['duration'])) {
+			mysqli_query($this->conn, "ALTER TABLE `".$this->tablename."` ADD `duration` INT(11) NOT NULL DEFAULT '0' AFTER `price`");
+		} else {
+			$type = strtolower((string)$cols['duration']['Type']);
+			if (strpos($type, 'varchar') !== false || strpos($type, 'char') !== false || strpos($type, 'text') !== false) {
+				/* Convert HH:MM:SS values to temporary int column then swap */
+				@mysqli_query($this->conn, "ALTER TABLE `".$this->tablename."` ADD `duration_minutes` INT(11) NOT NULL DEFAULT '0'");
+				$services = mysqli_query($this->conn, "SELECT `id`, `duration` FROM `".$this->tablename."`");
+				if ($services) {
+					while ($svc = mysqli_fetch_assoc($services)) {
+						$mins = self::duration_to_minutes($svc['duration']);
+						mysqli_query($this->conn, "UPDATE `".$this->tablename."` SET `duration_minutes`='".$mins."' WHERE `id`='".(int)$svc['id']."'");
+					}
+				}
+				@mysqli_query($this->conn, "ALTER TABLE `".$this->tablename."` DROP COLUMN `duration`");
+				@mysqli_query($this->conn, "ALTER TABLE `".$this->tablename."` CHANGE `duration_minutes` `duration` INT(11) NOT NULL DEFAULT '0'");
+			}
+		}
+		/* Seed from first unit when service still has zeros */
+		$services = mysqli_query($this->conn, "SELECT `id`,`price`,`duration` FROM `".$this->tablename."`");
+		if ($services) {
+			while ($svc = mysqli_fetch_assoc($services)) {
+				$need_price = ((float)$svc['price'] == 0);
+				$need_dur = (self::duration_to_minutes($svc['duration']) == 0);
+				if (!$need_price && !$need_dur) {
+					continue;
+				}
+				$unit = mysqli_query($this->conn, "SELECT `base_price`,`uduration` FROM `".$this->table_name_smu."` WHERE `services_id` = '".(int)$svc['id']."' ORDER BY `id` ASC LIMIT 1");
+				$u = $unit ? mysqli_fetch_assoc($unit) : null;
+				if (!$u) {
+					continue;
+				}
+				$new_price = $need_price ? (float)$u['base_price'] : (float)$svc['price'];
+				$new_dur = $need_dur ? (int)$u['uduration'] : self::duration_to_minutes($svc['duration']);
+				mysqli_query($this->conn, "UPDATE `".$this->tablename."` SET `price`='".$new_price."', `duration`='".$new_dur."' WHERE `id`='".(int)$svc['id']."'");
+			}
+		}
+	}
+
+	/** Keep method units in sync so booking cart still uses unit price/duration. */
+	public function sync_price_duration_to_units($service_id){
+		$service_id = (int)$service_id;
+		$price = (float)$this->price;
+		$duration = (int)$this->duration;
+		$units = mysqli_query($this->conn, "SELECT `id` FROM `".$this->table_name_smu."` WHERE `services_id` = '".$service_id."'");
+		if ($units && mysqli_num_rows($units) > 0) {
+			mysqli_query($this->conn, "UPDATE `".$this->table_name_smu."` SET `base_price`='".$price."', `uduration`='".$duration."' WHERE `services_id`='".$service_id."'");
+			return true;
+		}
+		/* Create a default method + unit so the service is bookable */
+		$method_title = mysqli_real_escape_string($this->conn, 'Standard');
+		mysqli_query($this->conn, "INSERT INTO `".$this->table_name_sm."` (`id`,`service_id`,`method_title`,`status`,`position`) VALUES (NULL,'".$service_id."','".$method_title."','E','0')");
+		$method_id = (int)mysqli_insert_id($this->conn);
+		if ($method_id <= 0) {
+			return false;
+		}
+		$unit_title = mysqli_real_escape_string($this->conn, 'Session');
+		mysqli_query($this->conn, "INSERT INTO `".$this->table_name_smu."` (`id`,`services_id`,`methods_id`,`units_title`,`base_price`,`minlimit`,`maxlimit`,`status`,`position`,`limit_title`,`unit_symbol`,`half_section`,`uduration`) VALUES (NULL,'".$service_id."','".$method_id."','".$unit_title."','".$price."','1','1','E','0','','','D','".$duration."')");
+		return true;
+	}
 	
 	/* Function for Add service*/
 	public function add_service(){
-		$query="insert into `".$this->tablename."` (`id`,`title`,`description`,`color`,`image`,`status`,`position`) values(NULL,'".$this->title."','".$this->description."','".$this->color."','".$this->image."','".$this->status."','".$this->position."')";
+		$query="insert into `".$this->tablename."` (`id`,`title`,`description`,`color`,`image`,`price`,`duration`,`status`,`position`) values(NULL,'".$this->title."','".$this->description."','".$this->color."','".$this->image."','".(float)$this->price."','".(int)$this->duration."','".$this->status."','".$this->position."')";
 		$result=mysqli_query($this->conn,$query);
 		$value=mysqli_insert_id($this->conn);
 		return $value;
 	}
 	/* Function for Update service-Not Used in this*/
 	public function update_service(){
-		$query="update `".$this->tablename."` set `title`='".$this->title."',`description`='".$this->description."',`image`='".$this->image."',`color`='".$this->color."' where `id`='".$this->id."' ";
+		$query="update `".$this->tablename."` set `title`='".$this->title."',`description`='".$this->description."',`image`='".$this->image."',`color`='".$this->color."',`price`='".(float)$this->price."',`duration`='".(int)$this->duration."' where `id`='".$this->id."' ";
 		$result=mysqli_query($this->conn,$query);
 		return $result;
 	}
@@ -103,14 +196,15 @@ class cleanto_services{
 	}
 	/* Function for Read Only one data matched with Id*/
 	public function readone(){
-		$query="select * from `".$this->tablename."` where `id`='".$this->id."'";
+		/* Legacy [1]=title — external_service_id/price/duration appended */
+		$query="select `id`, `title`, `description`, `color`, `image`, `status`, `position`, `external_service_id`, `price`, `duration` from `".$this->tablename."` where `id`='".$this->id."'";
 		$result=mysqli_query($this->conn,$query);
 		$value=mysqli_fetch_row($result);
 		return $value;
 	}
 	/* Function to fetch all data in admin panel*/
 	public function getalldata(){
-		$query="select * from `".$this->tablename."` order by `position`";
+		$query="select `id`, `title`, `description`, `color`, `image`, `status`, `position`, `external_service_id`, `price`, `duration` from `".$this->tablename."` order by `position`";
 		$result=mysqli_query($this->conn,$query);
 		
 		return $result;

@@ -5,7 +5,15 @@ include (dirname(__FILE__) . '/user_session_check.php');
 $con = new cleanto_db();
 $conn = $con->connect();
 $objservice = new cleanto_services();
-$objservice->conn = $conn; ?>
+$objservice->conn = $conn;
+$objservice->ensure_price_duration_schema();
+$duration_label = isset($label_language_values['duration']) ? $label_language_values['duration'] : 'Durata';
+$price_label = isset($label_language_values['price']) ? $label_language_values['price'] : 'Price';
+$currency_symbol = $setting->get_option('ct_currency_symbol');
+if ($currency_symbol === '' || $currency_symbol === null) {
+	$currency_symbol = '€';
+}
+?>
 <div id="cta-clean-services-panel" class="panel tab-content">    
     <div class="panel-body">        
         <div class="ct-clean-service-details tab-content col-md-12 col-sm-12 col-lg-12 col-xs-12">
@@ -95,10 +103,6 @@ $objservice->conn = $conn; ?>
                             </div> 
                           <span class="ct-clean-service-title-name" id="title_ser<?php if(isset($arr['id'])){ echo $arr['id']; }else{ } ?>"><?php echo ucfirst($arr['title']); ?></span></div>
                           <div class="pull-right cta-col5">
-                          <div class="cta-col6 cta-manage-price-addons">     
-                           <a data-id="<?php if(isset($arr['id'])){ echo $arr['id']; }else{ } ?>" data-name="<?php if(isset($arr['title'])){ echo $arr['title']; }else{ } ?>" class=" manage-price-calculation-btn pull-left btn-circle btn-primary btn-sm mybtnforassignmethods" title="<?php echo $label_language_values['manage_price_calculation_methods']; ?>"> <i class="fa fa-calculator" title="<?php echo $label_language_values['manage_price_calculation_methods']; ?>"></i><?php echo $label_language_values['pricing']; ?></a>                                               
-                           <a data-id="<?php if(isset($arr['id'])){ echo $arr['id']; }else{ } ?>" data-name="<?php if(isset($arr['title'])){ echo $arr['title']; }else{ } ?>" class="manage-addons-btn pull-left btn-circle btn-info btn-sm mybtnforassignaddons" title="Manage addons of this service"> <i class="fa fa-puzzle-piece" title="<?php echo $label_language_values['manage_addons_of_this_service']; ?>"></i><?php echo $label_language_values['add_ons']; ?></a>
-                         </div>                                                    
                     <div class="cta-col4 cta-enabe-disable">
                         <label for="sevice-endis-<?php echo $i; ?>">
                             <input data-id="<?php if(isset($arr['id'])){ echo $arr['id']; }else{ } ?>" class='myservice_status' data-toggle="toggle" data-size="small" type='checkbox' <?php if ($arr['status'] == 'E') { echo "checked"; }
@@ -153,6 +157,36 @@ $objservice->conn = $conn; ?>
                     <tr>
                         <td><label for="ct-service-desc"><?php echo $label_language_values['service_description']; ?></label></td>
                     	<td><textarea id="ct-service-desc" class="form-control edtservicedesc<?php if(isset($arr['id'])){ echo $arr['id']; }else{ } ?>" ><?php echo $arr['description']; ?></textarea></td>	
+                    </tr>
+                    <tr>
+                        <td><label for="ct-service-hours<?php if(isset($arr['id'])){ echo $arr['id']; }else{ } ?>"><?php echo htmlspecialchars($duration_label); ?></label></td>
+                        <td>
+                            <?php
+                            $svc_duration = isset($arr['duration']) ? cleanto_services::duration_to_minutes($arr['duration']) : 0;
+                            $svc_hours = intval($svc_duration / 60);
+                            $svc_mins = (int)($svc_duration % 60);
+                            ?>
+                            <div class="form-inline ct-service-duration-group">
+                                <div class="input-group">
+                                    <span class="input-group-addon"><span class="glyphicon glyphicon-time"></span></span>
+                                    <input placeholder="00" size="2" maxlength="2" type="text" class="form-control edtservicehours<?php if(isset($arr['id'])){ echo $arr['id']; }else{ } ?>" id="ct-service-hours<?php if(isset($arr['id'])){ echo $arr['id']; }else{ } ?>" value="<?php echo $svc_hours; ?>" />
+                                    <span class="input-group-addon"><?php echo isset($label_language_values['hours']) ? $label_language_values['hours'] : 'Ore'; ?></span>
+                                </div>
+                                <div class="input-group" style="margin-left:6px;">
+                                    <input placeholder="00" size="2" maxlength="2" type="text" class="form-control edtservicemins<?php if(isset($arr['id'])){ echo $arr['id']; }else{ } ?>" id="ct-service-mins<?php if(isset($arr['id'])){ echo $arr['id']; }else{ } ?>" value="<?php echo $svc_mins; ?>" />
+                                    <span class="input-group-addon"><?php echo isset($label_language_values['minutes']) ? $label_language_values['minutes'] : 'Minuti'; ?></span>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><label for="ct-service-price<?php if(isset($arr['id'])){ echo $arr['id']; }else{ } ?>"><?php echo isset($label_language_values['base_price']) ? $label_language_values['base_price'] : htmlspecialchars($price_label); ?></label></td>
+                        <td>
+                            <div class="input-group">
+                                <span class="input-group-addon"><?php echo htmlspecialchars($currency_symbol); ?></span>
+                                <input type="text" name="txtedtserviceprice" class="form-control edtserviceprice<?php if(isset($arr['id'])){ echo $arr['id']; }else{ } ?>" id="ct-service-price<?php if(isset($arr['id'])){ echo $arr['id']; }else{ } ?>" value="<?php echo isset($arr['price']) ? htmlspecialchars((string)$arr['price']) : '0'; ?>" />
+                            </div>
+                        </td>
                     </tr>
                     <tr>
                         <td><label for="ct-service-desc"><?php echo $label_language_values['service_image']; ?></label></td>
@@ -289,6 +323,31 @@ $objservice->conn = $conn; ?>
                 <tr> 
                   <td><label for="ct-service-desc"><?php echo $label_language_values['service_description']; ?></label></td> 
                   <td><textarea id="ct-service-desc" class="form-control myservicedesc"></textarea></td> 
+                 </tr>
+                 <tr>
+                  <td><label for="ct-service-hours"><?php echo htmlspecialchars($duration_label); ?></label></td>
+                  <td>
+                    <div class="form-inline ct-service-duration-group">
+                      <div class="input-group">
+                        <span class="input-group-addon"><span class="glyphicon glyphicon-time"></span></span>
+                        <input placeholder="00" size="2" maxlength="2" type="text" class="form-control myservicehours" id="ct-service-hours" value="1" />
+                        <span class="input-group-addon"><?php echo isset($label_language_values['hours']) ? $label_language_values['hours'] : 'Ore'; ?></span>
+                      </div>
+                      <div class="input-group" style="margin-left:6px;">
+                        <input placeholder="00" size="2" maxlength="2" type="text" class="form-control myservicemins" id="ct-service-mins" value="0" />
+                        <span class="input-group-addon"><?php echo isset($label_language_values['minutes']) ? $label_language_values['minutes'] : 'Minuti'; ?></span>
+                      </div>
+                    </div>
+                  </td>
+                 </tr>
+                 <tr>
+                  <td><label for="ct-service-price"><?php echo isset($label_language_values['base_price']) ? $label_language_values['base_price'] : htmlspecialchars($price_label); ?></label></td>
+                  <td>
+                    <div class="input-group">
+                      <span class="input-group-addon"><?php echo htmlspecialchars($currency_symbol); ?></span>
+                      <input type="text" name="txtserviceprice" class="form-control myserviceprice" id="ct-service-price" value="0" />
+                    </div>
+                  </td>
                  </tr>
                  <tr> 
                    <td><label for="ct-service-desc"><?php echo $label_language_values['service_image']; ?></label>

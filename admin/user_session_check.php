@@ -10,6 +10,7 @@ $isStaffArea = (strpos($scriptName, '/staff/') !== false);
 // Pages customers are allowed to access under /admin/
 $customerAllowedPages = array(
     'my-appointments.php',
+    'my-bookings.php',
     'user-profile.php',
     'wallet-history.php',
     'user_referral_code.php',

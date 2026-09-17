@@ -2262,22 +2262,22 @@ ADD  `commision_value` DOUBLE NOT NULL";
 			$label_decode_admin_unserial["jan"]=urlencode("JAN");
 			$label_decode_admin_unserial["new_appointment_assigned"]=urlencode("New Appointment Assigned");
 			$label_decode_admin_unserial["client_payments"] = urlencode("Client Payments");
-			$label_decode_admin_unserial["staff_payments"] = urlencode("Staff Payments");
-			$label_decode_admin_unserial["staff_payments_details"] = urlencode("Staff Payments Details");
+			$label_decode_admin_unserial["staff_payments"] = urlencode("Doctor Payments");
+			$label_decode_admin_unserial["staff_payments_details"] = urlencode("Doctor Payments Details");
 			$label_decode_admin_unserial["advance_paid"] = urlencode("Advance Paid");
 			$label_decode_admin_unserial["change_calculation_policyy"] = urlencode("Change Calculation Policy");
 			$label_decode_admin_unserial["frontend_fonts"] = urlencode("Frontend fonts");
 			$label_decode_admin_unserial["favicon_image"] = urlencode("Favicon Image");
-			$label_decode_admin_unserial["staff_email_template"] = urlencode("Staff Email Template");
-			$label_decode_admin_unserial["staff_details_add_new_and_manage_staff_payments"] = urlencode("Staff Details, Add new and manage staff payments");
-			$label_decode_admin_unserial["add_staff"] = urlencode("Add staff");
-			$label_decode_admin_unserial["staff_bookings_and_payments"] = urlencode("Staff Bookings & Payments");
-			$label_decode_admin_unserial["staff_booking_details_and_payment"] = urlencode("Staff Booking Details and Payment");
+			$label_decode_admin_unserial["staff_email_template"] = urlencode("Doctor Email Template");
+			$label_decode_admin_unserial["staff_details_add_new_and_manage_staff_payments"] = urlencode("Doctor Details, Add new and manage doctor payments");
+			$label_decode_admin_unserial["add_staff"] = urlencode("Add doctor");
+			$label_decode_admin_unserial["staff_bookings_and_payments"] = urlencode("Doctor Bookings & Payments");
+			$label_decode_admin_unserial["staff_booking_details_and_payment"] = urlencode("Doctor Booking Details and Payment");
 			$label_decode_admin_unserial["select_option_to_show_bookings"] = urlencode("Select option to show bookings");
 			$label_decode_admin_unserial["select_service"] = urlencode("Select Service");
-			$label_decode_admin_unserial["staff_name"] = urlencode("Staff Name");
-			$label_decode_admin_unserial["staff_payment"] = urlencode("Staff Payment");
-			$label_decode_admin_unserial["add_payment_to_staff_account"] = urlencode("Add Payment to staff account");
+			$label_decode_admin_unserial["staff_name"] = urlencode("Doctor Name");
+			$label_decode_admin_unserial["staff_payment"] = urlencode("Doctor Payment");
+			$label_decode_admin_unserial["add_payment_to_staff_account"] = urlencode("Add Payment to doctor account");
 			$label_decode_admin_unserial["amount_payable"] = urlencode("Amount Payable");
 			$label_decode_admin_unserial["advance_paid"] = urlencode("Advance Paid");
 			$label_decode_admin_unserial["save_changes"] = urlencode("Save changes");
@@ -2285,7 +2285,7 @@ ADD  `commision_value` DOUBLE NOT NULL";
 			$label_decode_admin_unserial["service_commission"]=urlencode("Service Commission");
 			$label_decode_admin_unserial["commission_total"]=urlencode("Commission Total");			
 			$label_decode_admin_unserial["front_tool_tips"]=urlencode("FRONT TOOL TIPS");
-			$label_decode_admin_unserial["staff_email_notification"]=urlencode("Staff Email Notification");
+			$label_decode_admin_unserial["staff_email_notification"]=urlencode("Doctor Email Notification");
 			$label_decode_admin_unserial["change_calculation_policy"]=urlencode("Change Calculation"); 
 			$label_decode_admin_unserial["multiply"]=urlencode("Multiply");
 			$label_decode_admin_unserial["equal"]=urlencode("Equal");
@@ -2299,10 +2299,10 @@ ADD  `commision_value` DOUBLE NOT NULL";
 			$label_decode_admin_unserial["enabled"]=urlencode("Enabled");
 			$label_decode_admin_unserial["vaccume_cleaner"]=urlencode("Vaccume Cleaner");
 			$label_decode_admin_unserial["parking"]=urlencode("Parking");
-			$label_decode_admin_unserial["staff_members"]=urlencode("Staff Members");
-			$label_decode_admin_unserial["add_new_staff_member"]=urlencode("Add new staff member");
+			$label_decode_admin_unserial["staff_members"]=urlencode("Doctors");
+			$label_decode_admin_unserial["add_new_staff_member"]=urlencode("Add new doctor");
 			$label_decode_admin_unserial["role"]=urlencode("Role");
-			$label_decode_admin_unserial["staff"]=urlencode("Staff");
+			$label_decode_admin_unserial["staff"]=urlencode("Doctor");
 			$label_decode_admin_unserial["admin"]=urlencode("Admin");
 			$label_decode_admin_unserial["create"]=urlencode("Create");
 			$label_decode_admin_unserial["service_details"]=urlencode("Service Details");
@@ -2312,8 +2312,8 @@ ADD  `commision_value` DOUBLE NOT NULL";
 			$label_decode_admin_unserial["percentage"]=urlencode("Percentage");
 			$label_decode_admin_unserial["flat_commission"]=urlencode("Flat Commission");
 			$label_decode_admin_unserial["save"]=urlencode("Save");
-			$label_decode_admin_unserial["staff_details"]=urlencode("STAFF DETAILS");
-			$label_decode_admin_unserial["assign_appointment_to_staff"]=urlencode("Assign Appointment to Staff");
+			$label_decode_admin_unserial["staff_details"]=urlencode("DOCTOR DETAILS");
+			$label_decode_admin_unserial["assign_appointment_to_staff"]=urlencode("Assign Appointment to Doctor");
 			$label_decode_admin_unserial["delete_member"]=urlencode("Delete Member?");
 			$label_decode_admin_unserial["manageable_form_fields_front_booking_form"]=urlencode("Manageable Form Fields For Front Booking Form");
 			$label_decode_admin_unserial["manageable_form_fields"]=urlencode("Manageable Form Fields");
@@ -3275,7 +3275,7 @@ $label_decode_admin_unserial["if_you_are_having_booking_system_which_need_the_bo
                         $label_decode_admin_unserial["paid"]=urlencode("Paid");
                         $label_decode_admin_unserial["accepted"]=urlencode("Accepted");
                         $label_decode_admin_unserial["payment_status"]=urlencode("Payment Status");
-                        $label_decode_admin_unserial["staff_booking_status"]=urlencode("Staff Booking Status");
+                        $label_decode_admin_unserial["staff_booking_status"]=urlencode("Doctor Booking Status");
                         
                         $label_decode_error_unserial["language_status_change_successfully"]=urlencode("Language Status Change Successfully");
                         $label_decode_error_unserial["commission_amount_should_not_be_greater_then_order_amount"]=urlencode("Commission Amount should not be Greater then Order Amount");
@@ -3633,8 +3633,8 @@ $label_decode_admin_unserial["if_you_are_having_booking_system_which_need_the_bo
 				$label_decode_admin_unserial["cart_is_empty"] = urlencode("Cart is empty");
 				$label_decode_admin_unserial["rating_and_review"] = urlencode("Rating & Review");
 				$label_decode_admin_unserial["review"] = urlencode("Review");
-				$label_decode_admin_unserial["show_frontend_staff_rating"] = urlencode("Show Frontend Staff Rating");
-				$label_decode_admin_unserial["with_enable_of_this_feature_shows_staff_rating_on_front_side"] = urlencode("With Enable of this feature, Shows staff rating on front side");
+				$label_decode_admin_unserial["show_frontend_staff_rating"] = urlencode("Show Frontend Doctor Rating");
+				$label_decode_admin_unserial["with_enable_of_this_feature_shows_staff_rating_on_front_side"] = urlencode("With Enable of this feature, Shows doctor rating on front side");
 				$label_decode_admin_unserial["complete_appointment"] = urlencode("Complete Appointment");
 				$label_decode_admin_unserial["complete"] = urlencode("Complete");
 				
@@ -4891,10 +4891,10 @@ $label_decode_admin_unserial["if_you_are_having_booking_system_which_need_the_bo
 				$label_decode_app_unserial["appointment_confirmed_successfully"] = urlencode("Appointment confirmed successfully");
 				$label_decode_app_unserial["appointment_completed_successfully"] = urlencode("Appointment completed successfully");
 				$label_decode_app_unserial["no_users_available"] = urlencode("No users available");
-				$label_decode_app_unserial["no_staff_available"] = urlencode("No staff available");
+				$label_decode_app_unserial["no_staff_available"] = urlencode("No doctor available");
 				$label_decode_app_unserial["no_payments_available"] = urlencode("No payments available");
-				$label_decode_app_unserial["staff_already_exist"] = urlencode("Staff already exist");
-				$label_decode_app_unserial["staff_created_successfully"] = urlencode("Staff created successfully");
+				$label_decode_app_unserial["staff_already_exist"] = urlencode("Doctor already exist");
+				$label_decode_app_unserial["staff_created_successfully"] = urlencode("Doctor created successfully");
 				$label_decode_app_unserial["profile_updated_successfully"] = urlencode("Profile updated successfully");
 				$label_decode_app_unserial["appointment_assigned_successfully"] = urlencode("Appointment assigned successfully");
 			}
@@ -4928,8 +4928,8 @@ $label_decode_admin_unserial["if_you_are_having_booking_system_which_need_the_bo
 		(NULL, 'Appointment Approved', '', 'RGVhciB7e3N0YWZmX25hbWV9fSwKWW91ciBhcHBvaW50bWVudCB3aXRoIHt7Y2xpZW50X25hbWV9fSBvbiB7e2Jvb2tpbmdfZGF0ZX19IGZvciB7e3NlcnZpY2VfbmFtZX19IGhhcyBiZWVuIGNvbmZpcm1lZC4=', 'E', 'C', 'S'),
 		(NULL, 'Appointment Rejected', '', 'RGVhciB7e3N0YWZmX25hbWV9fSwKWW91ciBhcHBvaW50bWVudCB3aXRoIHt7Y2xpZW50X25hbWV9fSBvbiB7e2Jvb2tpbmdfZGF0ZX19IGZvciB7e3NlcnZpY2VfbmFtZX19IGhhcyBiZWVuIHJlamVjdGVkLg==', 'E', 'R', 'S'),
 		(NULL, 'Appointment Cancelled By Customer', '', 'RGVhciB7e3N0YWZmX25hbWV9fSwKWW91ciBhcHBvaW50bWVudCB3aXRoIHt7Y2xpZW50X25hbWV9fSBvbiB7e2Jvb2tpbmdfZGF0ZX19IGZvciB7e3NlcnZpY2VfbmFtZX19IGhhcyBiZWVuIGNhbmNlbGxlZC4=', 'E', 'CC', 'S'),
-		(NULL, 'Appointment Rescheduled By Staff', '', 'RGVhciB7e3N0YWZmX25hbWV9fSwKWW91ciBhcHBvaW50bWVudCB3aXRoIHt7Y2xpZW50X25hbWV9fSBvbiB7e2Jvb2tpbmdfZGF0ZX19IGZvciB7e3NlcnZpY2VfbmFtZX19IGhhcyBiZWVuIHJlc2NoZWR1bGVkLg==', 'E', 'RS', 'S'),
-		(NULL, 'Staff Appointment Reminder', '', 'RGVhciB7e3N0YWZmX25hbWV9fSwKWW91ciBhcHBvaW50bWVudCB3aXRoIHt7Y2xpZW50X25hbWV9fSBpcyBzY2hlZHVsZWQgaW4ge3thcHBfcmVtYWluX3RpbWV9fSBob3Vycy4=', 'E', 'RM', 'S');");
+		(NULL, 'Appointment Rescheduled By Doctor', '', 'RGVhciB7e3N0YWZmX25hbWV9fSwKWW91ciBhcHBvaW50bWVudCB3aXRoIHt7Y2xpZW50X25hbWV9fSBvbiB7e2Jvb2tpbmdfZGF0ZX19IGZvciB7e3NlcnZpY2VfbmFtZX19IGhhcyBiZWVuIHJlc2NoZWR1bGVkLg==', 'E', 'RS', 'S'),
+		(NULL, 'Doctor Appointment Reminder', '', 'RGVhciB7e3N0YWZmX25hbWV9fSwKWW91ciBhcHBvaW50bWVudCB3aXRoIHt7Y2xpZW50X25hbWV9fSBpcyBzY2hlZHVsZWQgaW4ge3thcHBfcmVtYWluX3RpbWV9fSBob3Vycy4=', 'E', 'RM', 'S');");
 		
 		/* A Staff Email Templet Update */
 		$query = "UPDATE `ct_email_templates` SET `default_message`='PGh0bWw+DQo8aGVhZD4NCgk8bWV0YSBuYW1lPSJ2aWV3cG9ydCIgY29udGVudD0id2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEuMCIvPg0KCTxtZXRhIGh0dHAtZXF1aXY9IkNvbnRlbnQtVHlwZSIgY29udGVudD0idGV4dC9odG1sOyBjaGFyc2V0PVVURi04IiAvPg0KCTx0aXRsZT5TdWJqZWN0OiB7e3NlcnZpY2VfbmFtZX19IG9uIHt7Ym9va2luZ19kYXRlfX08L3RpdGxlPg0KCTxsaW5rIGhyZWY9Imh0dHBzOi8vZm9udHMuZ29vZ2xlYXBpcy5jb20vY3NzP2ZhbWlseT1Nb250c2VycmF0IiByZWw9InN0eWxlc2hlZXQiPg0KPC9oZWFkPg0KPGJvZHk+CQkNCgk8ZGl2IHN0eWxlPSJtYXJnaW46IDA7cGFkZGluZzogMDtmb250LWZhbWlseTogSGVsdmV0aWNhIE5ldWUsIEhlbHZldGljYSwgSGVsdmV0aWNhLCBBcmlhbCwgc2Fucy1zZXJpZjtmb250LXNpemU6IDEwMCU7bGluZS1oZWlnaHQ6IDEuNjtib3gtc2l6aW5nOiBib3JkZXItYm94OyI+CQ0KCQk8ZGl2IHN0eWxlPSJkaXNwbGF5OiBibG9jayAhaW1wb3J0YW50O21heC13aWR0aDogNjAwcHggIWltcG9ydGFudDttYXJnaW46IDAgYXV0byAhaW1wb3J0YW50O2NsZWFyOiBib3RoICFpbXBvcnRhbnQ7Ij4NCgkJCTx0YWJsZSBzdHlsZT0iYm9yZGVyOiAxcHggc29saWQgI2MyYzJjMjt3aWR0aDogMTAwJTtmbG9hdDogbGVmdDttYXJnaW46IDMwcHggMHB4Oy13ZWJraXQtYm9yZGVyLXJhZGl1czogNXB4Oy1tb3otYm9yZGVyLXJhZGl1czogNXB4Oy1vLWJvcmRlci1yYWRpdXM6IDVweDtib3JkZXItcmFkaXVzOiA1cHg7Ij4NCgkJCQk8dGJvZHk+DQoJCQkJCTx0ciBzdHlsZT0iYm9yZGVyLWJvdHRvbTogMXB4IHNvbGlkICNlNmU2ZTY7ZmxvYXQ6IGxlZnQ7d2lkdGg6IDEwMCU7ZGlzcGxheTogYmxvY2s7Ij4NCgkJCQkJCTx0ZCBzdHlsZT0id2lkdGg6IDU5JTt2ZXJ0aWNhbC1hbGlnbjogdG9wO2Zsb2F0OiBsZWZ0OyI+DQoJCQkJCQkJPGRpdiBzdHlsZT0idmVydGljYWwtYWxpZ246IHRvcDtmbG9hdDogbGVmdDtwYWRkaW5nOjE1cHg7d2lkdGg6IDEwMCU7Ym94LXNpemluZzogYm9yZGVyLWJveDstd2Via2l0LWJveC1zaXppbmc6IGJvcmRlci1ib3g7Y2xlYXI6IGxlZnQ7dGV4dC1hbGlnbjogbGVmdDtmb250LWZhbWlseTogTW9udHNlcnJhdCwgc2Fucy1zZXJpZjsiPg0KCQkJCQkJCQl7e2NvbXBhbnlfbmFtZX19PGJyIC8+e3tjb21wYW55X2FkZHJlc3N9fTxiciAvPnt7Y29tcGFueV9jaXR5fX0sIHt7Y29tcGFueV9zdGF0ZX19LCB7e2NvbXBhbnlfemlwfX08YnIgLz57e2NvbXBhbnlfY291bnRyeX19PGJyIC8+e3tjb21wYW55X3Bob25lfX08YnIgLz57e2NvbXBhbnlfZW1haWx9fQ0KCQkJCQkJCTwvZGl2Pg0KCQkJCQkJPC90ZD4NCgkJCQkJCTx0ZCBzdHlsZT0id2lkdGg6IDQwJTt2ZXJ0aWNhbC1hbGlnbjogdG9wO2Zsb2F0OiBsZWZ0OyI+DQoJCQkJCQkJPGRpdiBzdHlsZT0idmVydGljYWwtYWxpZ246IHRvcDtmbG9hdDogbGVmdDtwYWRkaW5nOjE1cHg7d2lkdGg6IDEwMCU7Ym94LXNpemluZzogYm9yZGVyLWJveDstd2Via2l0LWJveC1zaXppbmc6IGJvcmRlci1ib3g7Y2xlYXI6IGxlZnQ7Ij4NCgkJCQkJCQkJPGRpdiBzdHlsZT0id2lkdGg6IDEzMHB4O2hlaWdodDogMTAwJTt2ZXJ0aWNhbC1hbGlnbjogdG9wO21hcmdpbjogMHB4IGF1dG87Ij4NCgkJCQkJCQkJCTxpbWcgc3R5bGU9IndpZHRoOiAxMDAlO2Zsb2F0OiBsZWZ0O2Rpc3BsYXk6IGlubGluZS1ibG9jaztoZWlnaHQ6IDEwMCU7IiBzcmM9Int7YnVzaW5lc3NfbG9nb319IiAvPg0KCQkJCQkJCQk8L2Rpdj4NCgkJCQkJCQk8L2Rpdj4NCgkJCQkJCTwvdGQ+DQoJCQkJCQkNCgkJCQkJCQ0KCQkJCQk8L3RyPg0KCQkJCQk8dHI+DQoJCQkJCQk8dGQ+DQoJCQkJCQkJPGRpdiBzdHlsZT0icGFkZGluZzogMjVweCAzMHB4O2JhY2tncm91bmQ6ICNmZmY7ZmxvYXQ6IGxlZnQ7d2lkdGg6IDkwJTtkaXNwbGF5OiBibG9jazsiPg0KCQkJCQkJCQk8ZGl2IHN0eWxlPSJib3JkZXItYm90dG9tOiAxcHggc29saWQgI2U2ZTZlNjtmbG9hdDogbGVmdDt3aWR0aDogMTAwJTtkaXNwbGF5OiBibG9jazsiPg0KCQkJCQkJCQkJPGg2IHN0eWxlPSJjb2xvcjogIzYwNjA2MDtmb250LXNpemU6IDE1cHg7bWFyZ2luOiAxMHB4IDBweCAxMHB4O2ZvbnQtd2VpZ2h0OiA2MDA7Ij5EZWFyIHt7c3RhZmZfbmFtZX19LCA8L2g2Pg0KCQkJCQkJCQkJPHAgc3R5bGU9ImNvbG9yOiAjNjA2MDYwO2ZvbnQtc2l6ZTogMTVweDttYXJnaW46IDEwcHggMHB4IDE1cHg7Ij5Zb3UndmUgbmV3IGFwcG9pbnRtZW50IHdpdGgge3tjbGllbnRfbmFtZX19IHdpdGggZm9sbG93aW5nIGRldGFpbHM6PC9wPgkJCQkJCQkNCgkJCQkJCQkJPC9kaXY+DQoJCQkJCQkJCTxkaXYgc3R5bGU9ImZsb2F0OiBsZWZ0O3dpZHRoOiAxMDAlO2Rpc3BsYXk6IGJsb2NrO3BhZGRpbmc6IDEwcHggMHB4OyI+DQoJCQkJCQkJCQk8ZGl2IHN0eWxlPSJkaXNwbGF5OiBpbmxpbmUtYmxvY2s7d2lkdGg6IDEwMCU7ZmxvYXQ6IGxlZnQ7Ij4NCgkJCQkJCQkJCQk8bGFiZWwgc3R5bGU9ImZvbnQtc2l6ZTogMTVweDtjb2xvcjogIzk5OTk5OTtwYWRkaW5nLXJpZ2h0OiA1cHg7bWluLXdpZHRoOiA5NXB4O3doaXRlLXNwYWNlOiBub3dyYXA7ZmxvYXQ6IGxlZnQ7bGluZS1oZWlnaHQ6IDI1cHg7Ij5XaGVuOiA8L2xhYmVsPg0KCQkJCQkJCQkJCTxzcGFuIHN0eWxlPSJmb250LXNpemU6IDE1cHg7Zm9udC13ZWlnaHQ6IDQwMDtjb2xvcjogIzYwNjA2MDtsaW5lLWhlaWdodDogMjVweDtmbG9hdDogbGVmdDt3aWR0aDogNzYlO3dvcmQtd3JhcDogYnJlYWstd29yZDttYXgtaGVpZ2h0OiA3MHB4O292ZXJmbG93OiBhdXRvOyI+IHt7Ym9va2luZ19kYXRlfX08L3NwYW4+DQoJCQkJCQkJCQk8L2Rpdj4NCgkJCQkJCQkJCTxkaXYgc3R5bGU9ImRpc3BsYXk6IGlubGluZS1ibG9jazt3aWR0aDogMTAwJTtmbG9hdDogbGVmdDsiPg0KCQkJCQkJCQkJCTxsYWJlbCBzdHlsZT0iZm9udC1zaXplOiAxNXB4O2NvbG9yOiAjOTk5OTk5O3BhZGRpbmctcmlnaHQ6IDVweDttaW4td2lkdGg6IDk1cHg7d2hpdGUtc3BhY2U6IG5vd3JhcDtmbG9hdDogbGVmdDtsaW5lLWhlaWdodDogMjVweDsiPkZvcjogPC9sYWJlbD4NCgkJCQkJCQkJCQk8c3BhbiBzdHlsZT0iZm9udC1zaXplOiAxNXB4O2ZvbnQtd2VpZ2h0OiA0MDA7Y29sb3I6ICM2MDYwNjA7bGluZS1oZWlnaHQ6IDI1cHg7ZmxvYXQ6IGxlZnQ7d2lkdGg6IDc2JTt3b3JkLXdyYXA6IGJyZWFrLXdvcmQ7bWF4LWhlaWdodDogNzBweDtvdmVyZmxvdzogYXV0bzsiPiB7e3NlcnZpY2VfbmFtZX19PC9zcGFuPg0KCQkJCQkJCQkJPC9kaXY+DQoJCQkJCQkJCQk8ZGl2IHN0eWxlPSJkaXNwbGF5OiBpbmxpbmUtYmxvY2s7d2lkdGg6IDEwMCU7ZmxvYXQ6IGxlZnQ7Ij4NCgkJCQkJCQkJCQk8bGFiZWwgc3R5bGU9ImZvbnQtc2l6ZTogMTVweDtjb2xvcjogIzk5OTk5OTtwYWRkaW5nLXJpZ2h0OiA1cHg7bWluLXdpZHRoOiA5NXB4O3doaXRlLXNwYWNlOiBub3dyYXA7ZmxvYXQ6IGxlZnQ7bGluZS1oZWlnaHQ6IDI1cHg7Ij5NZXRob2RzIDogPC9sYWJlbD4NCgkJCQkJCQkJCQk8c3BhbiBzdHlsZT0iZm9udC1zaXplOiAxNXB4O2ZvbnQtd2VpZ2h0OiA0MDA7Y29sb3I6ICM2MDYwNjA7bGluZS1oZWlnaHQ6IDI1cHg7ZmxvYXQ6IGxlZnQ7d2lkdGg6IDc2JTt3b3JkLXdyYXA6IGJyZWFrLXdvcmQ7bWF4LWhlaWdodDogNzBweDtvdmVyZmxvdzogYXV0bzsiPiB7e21ldGhvZG5hbWV9fTwvc3Bhbj4NCgkJCQkJCQkJCTwvZGl2Pg0KCQkJCQkJCQkJPGRpdiBzdHlsZT0iZGlzcGxheTogaW5saW5lLWJsb2NrO3dpZHRoOiAxMDAlO2Zsb2F0OiBsZWZ0OyI+DQoJCQkJCQkJCQkJPGxhYmVsIHN0eWxlPSJmb250LXNpemU6IDE1cHg7Y29sb3I6ICM5OTk5OTk7cGFkZGluZy1yaWdodDogNXB4O21pbi13aWR0aDogOTVweDt3aGl0ZS1zcGFjZTogbm93cmFwO2Zsb2F0OiBsZWZ0O2xpbmUtaGVpZ2h0OiAyNXB4OyI+VW5pdHMgOiA8L2xhYmVsPg0KCQkJCQkJCQkJCTxzcGFuIHN0eWxlPSJmb250LXNpemU6IDE1cHg7Zm9udC13ZWlnaHQ6IDQwMDtjb2xvcjogIzYwNjA2MDtsaW5lLWhlaWdodDogMjVweDtmbG9hdDogbGVmdDt3aWR0aDogNzYlO3dvcmQtd3JhcDogYnJlYWstd29yZDttYXgtaGVpZ2h0OiA3MHB4O292ZXJmbG93OiBhdXRvOyI+IHt7dW5pdHN9fTwvc3Bhbj4NCgkJCQkJCQkJCTwvZGl2Pg0KCQkJCQkJCQkJPGRpdiBzdHlsZT0iZGlzcGxheTogaW5saW5lLWJsb2NrO3dpZHRoOiAxMDAlO2Zsb2F0OiBsZWZ0OyI+DQoJCQkJCQkJCQkJPGxhYmVsIHN0eWxlPSJmb250LXNpemU6IDE1cHg7Y29sb3I6ICM5OTk5OTk7cGFkZGluZy1yaWdodDogNXB4O21pbi13aWR0aDogOTVweDt3aGl0ZS1zcGFjZTogbm93cmFwO2Zsb2F0OiBsZWZ0O2xpbmUtaGVpZ2h0OiAyNXB4OyI+QWRkLW9ucyA6IDwvbGFiZWw+DQoJCQkJCQkJCQkJPHNwYW4gc3R5bGU9ImZvbnQtc2l6ZTogMTVweDtmb250LXdlaWdodDogNDAwO2NvbG9yOiAjNjA2MDYwO2xpbmUtaGVpZ2h0OiAyNXB4O2Zsb2F0OiBsZWZ0O3dpZHRoOiA3NiU7d29yZC13cmFwOiBicmVhay13b3JkO21heC1oZWlnaHQ6IDcwcHg7b3ZlcmZsb3c6IGF1dG87Ij4ge3thZGRvbnN9fTwvc3Bhbj4NCgkJCQkJCQkJCTwvZGl2Pg0KCQkJCQkJCQkJPGRpdiBzdHlsZT0iZGlzcGxheTogaW5saW5lLWJsb2NrO3dpZHRoOiAxMDAlO2Zsb2F0OiBsZWZ0OyI+DQoJCQkJCQkJCQkJPGxhYmVsIHN0eWxlPSJmb250LXNpemU6IDE1cHg7Y29sb3I6ICM5OTk5OTk7cGFkZGluZy1yaWdodDogNXB4O21pbi13aWR0aDogOTVweDt3aGl0ZS1zcGFjZTogbm93cmFwO2Zsb2F0OiBsZWZ0O2xpbmUtaGVpZ2h0OiAyNXB4OyI+UHJpY2UgOiA8L2xhYmVsPg0KCQkJCQkJCQkJCTxzcGFuIHN0eWxlPSJmb250LXNpemU6IDE1cHg7Zm9udC13ZWlnaHQ6IDQwMDtjb2xvcjogIzYwNjA2MDtsaW5lLWhlaWdodDogMjVweDtmbG9hdDogbGVmdDt3aWR0aDogNzYlO3dvcmQtd3JhcDogYnJlYWstd29yZDttYXgtaGVpZ2h0OiA3MHB4O292ZXJmbG93OiBhdXRvOyI+IHt7cHJpY2V9fTwvc3Bhbj4NCgkJCQkJCQkJCTwvZGl2Pg0KCQkJCQkJCQkJDQoJCQkJCQkJCQkNCgkJCQkJCQkJCTxkaXYgc3R5bGU9ImRpc3BsYXk6IGlubGluZS1ibG9jazt3aWR0aDogMTAwJTtmbG9hdDogbGVmdDsiPg0KCQkJCQkJCQkJCTxsYWJlbCBzdHlsZT0iZm9udC1zaXplOiAxNXB4O2NvbG9yOiAjOTk5OTk5O3BhZGRpbmctcmlnaHQ6IDVweDttaW4td2lkdGg6IDk1cHg7d2hpdGUtc3BhY2U6IG5vd3JhcDtmbG9hdDogbGVmdDtsaW5lLWhlaWdodDogMjVweDsiPk5hbWUgOiA8L2xhYmVsPg0KCQkJCQkJCQkJCTxzcGFuIHN0eWxlPSJmb250LXNpemU6IDE1cHg7Zm9udC13ZWlnaHQ6IDQwMDtjb2xvcjogIzYwNjA2MDtsaW5lLWhlaWdodDogMjVweDtmbG9hdDogbGVmdDt3aWR0aDogNzYlO3dvcmQtd3JhcDogYnJlYWstd29yZDttYXgtaGVpZ2h0OiA3MHB4O292ZXJmbG93OiBhdXRvOyI+IHt7Zmlyc3RuYW1lfX0ge3tsYXN0bmFtZX19PC9zcGFuPg0KCQkJCQkJCQkJPC9kaXY+DQoJCQkJCQkJCQk8ZGl2IHN0eWxlPSJkaXNwbGF5OiBpbmxpbmUtYmxvY2s7d2lkdGg6IDEwMCU7ZmxvYXQ6IGxlZnQ7Ij4NCgkJCQkJCQkJCQk8bGFiZWwgc3R5bGU9ImZvbnQtc2l6ZTogMTVweDtjb2xvcjogIzk5OTk5OTtwYWRkaW5nLXJpZ2h0OiA1cHg7bWluLXdpZHRoOiA5NXB4O3doaXRlLXNwYWNlOiBub3dyYXA7ZmxvYXQ6IGxlZnQ7bGluZS1oZWlnaHQ6IDI1cHg7Ij5FbWFpbCA6IDwvbGFiZWw+DQoJCQkJCQkJCQkJPHNwYW4gc3R5bGU9ImZvbnQtc2l6ZTogMTVweDtmb250LXdlaWdodDogNDAwO2NvbG9yOiAjNjA2MDYwO2xpbmUtaGVpZ2h0OiAyNXB4O2Zsb2F0OiBsZWZ0O3dpZHRoOiA3NiU7d29yZC13cmFwOiBicmVhay13b3JkO21heC1oZWlnaHQ6IDcwcHg7b3ZlcmZsb3c6IGF1dG87Ij4ge3tjbGllbnRfZW1haWx9fTwvc3Bhbj4NCgkJCQkJCQkJCTwvZGl2Pg0KCQkJCQkJCQkJPGRpdiBzdHlsZT0iZGlzcGxheTogaW5saW5lLWJsb2NrO3dpZHRoOiAxMDAlO2Zsb2F0OiBsZWZ0OyI+DQoJCQkJCQkJCQkJPGxhYmVsIHN0eWxlPSJmb250LXNpemU6IDE1cHg7Y29sb3I6ICM5OTk5OTk7cGFkZGluZy1yaWdodDogNXB4O21pbi13aWR0aDogOTVweDt3aGl0ZS1zcGFjZTogbm93cmFwO2Zsb2F0OiBsZWZ0O2xpbmUtaGVpZ2h0OiAyNXB4OyI+UGhvbmUgOiA8L2xhYmVsPg0KCQkJCQkJCQkJCTxzcGFuIHN0eWxlPSJmb250LXNpemU6IDE1cHg7Zm9udC13ZWlnaHQ6IDQwMDtjb2xvcjogIzYwNjA2MDtsaW5lLWhlaWdodDogMjVweDtmbG9hdDogbGVmdDt3aWR0aDogNzYlO3dvcmQtd3JhcDogYnJlYWstd29yZDttYXgtaGVpZ2h0OiA3MHB4O292ZXJmbG93OiBhdXRvOyI+IHt7cGhvbmV9fTwvc3Bhbj4NCgkJCQkJCQkJCTwvZGl2Pg0KCQkJCQkJCQkJPGRpdiBzdHlsZT0iZGlzcGxheTogaW5saW5lLWJsb2NrO3dpZHRoOiAxMDAlO2Zsb2F0OiBsZWZ0OyI+DQoJCQkJCQkJCQkJPGxhYmVsIHN0eWxlPSJmb250LXNpemU6IDE1cHg7Y29sb3I6ICM5OTk5OTk7cGFkZGluZy1yaWdodDogNXB4O21pbi13aWR0aDogOTVweDt3aGl0ZS1zcGFjZTogbm93cmFwO2Zsb2F0OiBsZWZ0O2xpbmUtaGVpZ2h0OiAyNXB4OyI+UGF5bWVudCA6IDwvbGFiZWw+DQoJCQkJCQkJCQkJPHNwYW4gc3R5bGU9ImZvbnQtc2l6ZTogMTVweDtmb250LXdlaWdodDogNDAwO2NvbG9yOiAjNjA2MDYwO2xpbmUtaGVpZ2h0OiAyNXB4O2Zsb2F0OiBsZWZ0O3dpZHRoOiA3NiU7d29yZC13cmFwOiBicmVhay13b3JkO21heC1oZWlnaHQ6IDcwcHg7b3ZlcmZsb3c6IGF1dG87Ij4ge3twYXltZW50X21ldGhvZH19PC9zcGFuPg0KCQkJCQkJCQkJPC9kaXY+DQoJCQkJCQkJCQk8ZGl2IHN0eWxlPSJkaXNwbGF5OiBpbmxpbmUtYmxvY2s7d2lkdGg6IDEwMCU7ZmxvYXQ6IGxlZnQ7Ij4NCgkJCQkJCQkJCQk8bGFiZWwgc3R5bGU9ImZvbnQtc2l6ZTogMTVweDtjb2xvcjogIzk5OTk5OTtwYWRkaW5nLXJpZ2h0OiA1cHg7bWluLXdpZHRoOiA5NXB4O3doaXRlLXNwYWNlOiBub3dyYXA7ZmxvYXQ6IGxlZnQ7bGluZS1oZWlnaHQ6IDI1cHg7Ij5WYWNjdW0gQ2xlYW5lciA6IDwvbGFiZWw+DQoJCQkJCQkJCQkJPHNwYW4gc3R5bGU9ImZvbnQtc2l6ZTogMTVweDtmb250LXdlaWdodDogNDAwO2NvbG9yOiAjNjA2MDYwO2xpbmUtaGVpZ2h0OiAyNXB4O2Zsb2F0OiBsZWZ0O3dpZHRoOiA3NiU7d29yZC13cmFwOiBicmVhay13b3JkO21heC1oZWlnaHQ6IDcwcHg7b3ZlcmZsb3c6IGF1dG87Ij4ge3t2YWNjdW1fY2xlYW5lcl9zdGF0dXN9fTwvc3Bhbj4NCgkJCQkJCQkJCTwvZGl2Pg0KCQkJCQkJCQkJPGRpdiBzdHlsZT0iZGlzcGxheTogaW5saW5lLWJsb2NrO3dpZHRoOiAxMDAlO2Zsb2F0OiBsZWZ0OyI+DQoJCQkJCQkJCQkJPGxhYmVsIHN0eWxlPSJmb250LXNpemU6IDE1cHg7Y29sb3I6ICM5OTk5OTk7cGFkZGluZy1yaWdodDogNXB4O21pbi13aWR0aDogOTVweDt3aGl0ZS1zcGFjZTogbm93cmFwO2Zsb2F0OiBsZWZ0O2xpbmUtaGVpZ2h0OiAyNXB4OyI+UGFya2luZyA6IDwvbGFiZWw+DQoJCQkJCQkJCQkJPHNwYW4gc3R5bGU9ImZvbnQtc2l6ZTogMTVweDtmb250LXdlaWdodDogNDAwO2NvbG9yOiAjNjA2MDYwO2xpbmUtaGVpZ2h0OiAyNXB4O2Zsb2F0OiBsZWZ0O3dpZHRoOiA3NiU7d29yZC13cmFwOiBicmVhay13b3JkO21heC1oZWlnaHQ6IDcwcHg7b3ZlcmZsb3c6IGF1dG87Ij4ge3twYXJraW5nX3N0YXR1c319PC9zcGFuPg0KCQkJCQkJCQkJPC9kaXY+DQoJCQkJCQkJCQk8ZGl2IHN0eWxlPSJkaXNwbGF5OiBpbmxpbmUtYmxvY2s7d2lkdGg6IDEwMCU7ZmxvYXQ6IGxlZnQ7Ij4NCgkJCQkJCQkJCQk8bGFiZWwgc3R5bGU9ImZvbnQtc2l6ZTogMTVweDtjb2xvcjogIzk5OTk5OTtwYWRkaW5nLXJpZ2h0OiA1cHg7bWluLXdpZHRoOiA5NXB4O3doaXRlLXNwYWNlOiBub3dyYXA7ZmxvYXQ6IGxlZnQ7bGluZS1oZWlnaHQ6IDI1cHg7Ij5BZGRyZXNzIDogPC9sYWJlbD4NCgkJCQkJCQkJCQk8c3BhbiBzdHlsZT0iZm9udC1zaXplOiAxNXB4O2ZvbnQtd2VpZ2h0OiA0MDA7Y29sb3I6ICM2MDYwNjA7bGluZS1oZWlnaHQ6IDI1cHg7ZmxvYXQ6IGxlZnQ7d2lkdGg6IDc2JTt3b3JkLXdyYXA6IGJyZWFrLXdvcmQ7bWF4LWhlaWdodDogNzBweDtvdmVyZmxvdzogYXV0bzsiPiB7e2FkZHJlc3N9fTwvc3Bhbj4NCgkJCQkJCQkJCTwvZGl2Pg0KCQkJCQkJCQkJPGRpdiBzdHlsZT0iZGlzcGxheTogaW5saW5lLWJsb2NrO3dpZHRoOiAxMDAlO2Zsb2F0OiBsZWZ0OyI+DQoJCQkJCQkJCQkJPGxhYmVsIHN0eWxlPSJmb250LXNpemU6IDE1cHg7Y29sb3I6ICM5OTk5OTk7cGFkZGluZy1yaWdodDogNXB4O21pbi13aWR0aDogOTVweDt3aGl0ZS1zcGFjZTogbm93cmFwO2Zsb2F0OiBsZWZ0O2xpbmUtaGVpZ2h0OiAyNXB4OyI+Tm90ZXMgOiA8L2xhYmVsPg0KCQkJCQkJCQkJCTxzcGFuIHN0eWxlPSJmb250LXNpemU6IDE1cHg7Zm9udC13ZWlnaHQ6IDQwMDtjb2xvcjogIzYwNjA2MDtsaW5lLWhlaWdodDogMjVweDtmbG9hdDogbGVmdDt3aWR0aDogNzYlO3dvcmQtd3JhcDogYnJlYWstd29yZDttYXgtaGVpZ2h0OiA3MHB4O292ZXJmbG93OiBhdXRvOyI+IHt7bm90ZXN9fTwvc3Bhbj4NCgkJCQkJCQkJCTwvZGl2Pg0KCQkJCQkJCQkJPGRpdiBzdHlsZT0iZGlzcGxheTogaW5saW5lLWJsb2NrO3dpZHRoOiAxMDAlO2Zsb2F0OiBsZWZ0OyI+DQoJCQkJCQkJCQkJPGxhYmVsIHN0eWxlPSJmb250LXNpemU6IDE1cHg7Y29sb3I6ICM5OTk5OTk7cGFkZGluZy1yaWdodDogNXB4O21pbi13aWR0aDogOTVweDt3aGl0ZS1zcGFjZTogbm93cmFwO2Zsb2F0OiBsZWZ0O2xpbmUtaGVpZ2h0OiAyNXB4OyI+Q29udGFjdCBTdGF0dXMgOiA8L2xhYmVsPg0KCQkJCQkJCQkJCTxzcGFuIHN0eWxlPSJmb250LXNpemU6IDE1cHg7Zm9udC13ZWlnaHQ6IDQwMDtjb2xvcjogIzYwNjA2MDtsaW5lLWhlaWdodDogMjVweDtmbG9hdDogbGVmdDt3aWR0aDogNzYlO3dvcmQtd3JhcDogYnJlYWstd29yZDttYXgtaGVpZ2h0OiA3MHB4O292ZXJmbG93OiBhdXRvOyI+IHt7Y29udGFjdF9zdGF0dXN9fTwvc3Bhbj4NCgkJCQkJCQkJCTwvZGl2Pg0KCQkJCQkJCQk8L2Rpdj4NCgkJCQkJCQkJPGRpdiBzdHlsZT0icGFkZGluZzogMTVweCAwcHg7ZmxvYXQ6IGxlZnQ7d2lkdGg6IDEwMCU7Ym9yZGVyLWJvdHRvbTogMXB4IHNvbGlkICNlNmU2ZTY7Ij4NCgkJCQkJCQkJCTxwIHN0eWxlPSJjb2xvcjogIzYwNjA2MDtmb250LXNpemU6IDE1cHg7bGluZS1oZWlnaHQ6IDIycHg7bWFyZ2luOiAxMHB4IDBweCAxNXB4O2Zsb2F0OiBsZWZ0OyI+VGhpcyBhcHBvaW50bWVudCBpcyBwZW5kaW5nLjwvcD4NCgkJCQkJCQkJPC9kaXY+DQoJCQkJCQkJCTxkaXYgc3R5bGU9InBhZGRpbmc6IDEwcHggMHB4O2Zsb2F0OiBsZWZ0O3dpZHRoOiAxMDAlO2Rpc3BsYXk6IGJsb2NrO3RleHQtYWxpZ246IGNlbnRlcjsiPg0KCQkJCQkJCQkJPGg1IHN0eWxlPSJjb2xvcjogIzYwNjA2MDtmb250LXNpemU6IDEzcHg7bWFyZ2luOiAwcHggMHB4IDVweDsiPlRoYW5rIHlvdTwvaDU+DQoJCQkJCQkJCTwvZGl2Pg0KCQkJCQkJCTwvZGl2Pg0KCQkJCQkJPC90ZD4JCQkJCQ0KCQkJCQk8L3RyPgkJCQkNCgkJCQk8L3Rib2R5Pg0KCQkJPC90YWJsZT4JDQoJCTwvZGl2Pg0KCTwvZGl2PgkNCjwvYm9keT4NCjwvaHRtbD4=' WHERE `user_type`='S' AND `email_template_type`='A'";
@@ -5073,13 +5073,13 @@ $label_decode_admin_unserial["if_you_are_having_booking_system_which_need_the_bo
 				$label_decode_admin_unserial["staff__name"] = urlencode("staff_name");
 				$label_decode_admin_unserial["enable_or_disable_send_sms_to_staff_for_appointment_booking_info"] = urlencode("启用或禁用，向员工发送短信以获取预约信息。");
 			}else{
-				$label_decode_admin_unserial["send_sms_to_staff"] = urlencode("Send SMS To Staff");
-				$label_decode_admin_unserial["staff_sms_template"] = urlencode("Staff SMS Template");
+				$label_decode_admin_unserial["send_sms_to_staff"] = urlencode("Send SMS To Doctor");
+				$label_decode_admin_unserial["staff_sms_template"] = urlencode("Doctor SMS Template");
 				$label_decode_admin_unserial["preview_template"] = urlencode("Preview Template");
 				$label_decode_admin_unserial["client__promocode"] = urlencode("client_promocode");
 				$label_decode_admin_unserial["staff__email"] = urlencode("staff_email");
 				$label_decode_admin_unserial["staff__name"] = urlencode("staff_name");
-				$label_decode_admin_unserial["enable_or_disable_send_sms_to_staff_for_appointment_booking_info"] = urlencode("Enable or Disable, Send SMS to staff for appointment booking info.");
+				$label_decode_admin_unserial["enable_or_disable_send_sms_to_staff_for_appointment_booking_info"] = urlencode("Enable or Disable, Send SMS to doctor for appointment booking info.");
 			}
 			
 			$language_front_arr = base64_encode(serialize($label_decode_front_unserial));

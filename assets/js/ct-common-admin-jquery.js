@@ -143,19 +143,10 @@ jQuery(document).ready(function () {
       return jQuery("#popover-reject-appointment-cal-popup").html();
     }
   });
-  /*  delete appointment in modal window  */
-  jQuery("#ct-delete-appointment-cal-popup").popover({
-    html: true,
-    content: function () {
-      return jQuery("#popover-delete-appointment-cal-popup").html();
-    }
-  });
-  jQuery("#ct-delete-appointment-cal-popup1").popover({
-    html: true,
-    content: function () {
-      return jQuery("#popover-delete-appointment-cal-popup1").html();
-    }
-  });
+  /* Admin calendar Delete uses inline panel (popover-in-modal is unreliable) */
+  try {
+    jQuery("#ct-delete-appointment-cal-popup").popover("destroy");
+  } catch (errDelPop) { }
   jQuery("#edit-ct-reject-appointment").popover({
     html: true,
     content: function () {
@@ -862,7 +853,7 @@ jQuery(document).ready(function () {
       ct_company_phone: { minlength: errorobj_please_enter_minimum_5_digits, maxlength: errorobj_please_enter_maximum_14_digits, number: errorobj_please_enter_only_numerics }
     }
   });
-  /*  cancel booking popover  */
+  /*  cancel booking — legacy popover (list pages may still use class)  */
   jQuery(".cancel_appointment").popover({
     html: true,
     content: function () {
@@ -870,9 +861,45 @@ jQuery(document).ready(function () {
       return jQuery("#popover-user-cancel-appointment" + id).html();
     }
   });
-  jQuery("#btn-change-pass").click(function () {
-    jQuery(".ct-change-password").show("blind", { direction: "vertical" }, 1000);
-    jQuery("#btn-change-pass").hide();
+  /* Customer booking details: inline cancel panel (avoids popover-in-modal) */
+  jQuery(document).on("click", ".ct-cust-cancel-toggle", function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    var orderId = jQuery(this).attr("data-order_id") || jQuery(this).attr("data-id");
+    var $modal = jQuery(this).closest(".user-booking-details");
+    $modal.find(".ct-cust-cancel-panel").not("#ct-cust-cancel-panel" + orderId).slideUp(120);
+    $modal.find("#ct-cust-cancel-panel" + orderId).slideToggle(150);
+  });
+  jQuery(document).on("click", ".ct-cust-cancel-dismiss", function (e) {
+    e.preventDefault();
+    jQuery(this).closest(".ct-cust-cancel-panel").slideUp(150);
+  });
+  /* Customer: close details first, then open reschedule (no stacked modals) */
+  jQuery(document).on("click", ".ct-cust-reschedule-open", function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    var orderId = jQuery(this).attr("data-order_id");
+    var total = jQuery(this).attr("data-total_price");
+    var target = "#update-user-booking-details" + orderId;
+    localStorage.setItem("order_id", orderId);
+    if (total) {
+      jQuery(".booking_total_payment").html("<span class=''>" + total + "</span>");
+    }
+    var $details = jQuery(this).closest(".user-booking-details");
+    if ($details.length && $details.hasClass("in")) {
+      $details.one("hidden.bs.modal", function () {
+        jQuery(target).modal("show");
+      });
+      $details.modal("hide");
+    } else {
+      jQuery(target).modal("show");
+    }
+  });
+  jQuery(document).off("click.ctProfilePass", "#btn-change-pass").on("click.ctProfilePass", "#btn-change-pass", function (e) {
+    e.preventDefault();
+    var $box = jQuery(".ct-change-password").first();
+    $box.removeClass("hide-div").addClass("is-open").stop(true, true).hide().slideDown(280);
+    jQuery(this).hide();
   });
   jQuery.ajax({
     type: "post",
@@ -981,9 +1008,6 @@ jQuery(document).on('click', '#ct-close-popover-staff-image', function () {
 });
 jQuery(document).on('click', '#ct-close-del-appointment-cal-popup', function () {
   jQuery('#ct-delete-appointment-cal-popup').trigger('click');
-});
-jQuery(document).on('click', '#ct-close-del-appointment-cal-popup1', function () {
-  jQuery('#ct-delete-appointment-cal-popup1').trigger('click');
 });
 jQuery(document).on('click', '#ct-close-popover-delete-reccurence', function () {
   jQuery('#ct-close-popover-delete-reccurencesss').trigger('click');
@@ -1144,62 +1168,50 @@ jQuery(document).ready(function () {
     disableDragging: true,
     eventRender: function (event, element) {
       var event_st = event.event_status;
+      var isCustomerCal = (typeof ct_customer_calendar !== "undefined" && ct_customer_calendar === true);
+      var eventBody = isCustomerCal
+        ? ("<div><i class='fa fa-clock-o'></i>" + event.start.format(tymfrmt) + "</div><div>" + event.title + "</div><div><hr id='hr' /></div><div>" + (event.total_price || "") + "</div>")
+        : ("<div><i class='fa fa-clock-o'></i>" + event.start.format(tymfrmt) + "</div><div>" + event.title + "</div><div><hr id='hr' /></div><div>" + event.client_name + "</div><div>" + event.client_phone + "</div><div>" + event.client_email + "</div>");
       if (event_st == "C") {
         element.find(".fc-title").hide();
         element.find(".fc-time").hide();
         element.find(".fc-title").before(jQuery("<i class='fa fa-check txt-success' title='" + errorobj_confirmed + "'></i>"));
-        element.find(".fc-title").after(
-          jQuery("<div><i class='fa fa-clock-o'></i>" + event.start.format(tymfrmt) + "</div><div>" + event.title + "</div><div><hr id='hr' /></div><div>" + event.client_name + "</div><div>" + event.client_phone + "</div><div>" + event.client_email + "</div>")
-        );
+        element.find(".fc-title").after(jQuery(eventBody));
       } else if (event_st == "R") {
         element.find(".fc-title").hide();
         element.find(".fc-time").hide();
         element.find(".fc-title").before(jQuery("<i class='fa fa-ban txt-danger' title='" + errorobj_rejected + "'></i>"));
-        element.find(".fc-title").after(
-          jQuery("<div><i class='fa fa-clock-o'></i>" + event.start.format(tymfrmt) + "</div><div>" + event.title + "</div> <div><hr id='hr' /></div><div>" + event.client_name + "</div><div>" + event.client_phone + "</div><div>" + event.client_email + "</div>")
-        );
+        element.find(".fc-title").after(jQuery(eventBody));
       } else if (event_st == "CC") {
         element.find(".fc-title").hide();
         element.find(".fc-time").hide();
         element.find(".fc-title").before(jQuery("<i class='fa fa-times txt-primary' title='" + errorobj_cancelled_by_client + "'></i>"));
-        element.find(".fc-title").after(
-          jQuery("<div><i class='fa fa-clock-o'></i>" + event.start.format(tymfrmt) + "</div><div>" + event.title + "</div> <div><hr id='hr' /></div><div>" + event.client_name + "</div><div>" + event.client_phone + "</div><div>" + event.client_email + "</div>")
-        );
+        element.find(".fc-title").after(jQuery(eventBody));
       } else if (event_st == "A" || event_st == "") {
         element.find(".fc-title").hide();
         element.find(".fc-time").hide();
         element.find(".fc-title").before(jQuery("<i class='fa fa-info-circle txt-warning' title='" + errorobj_pending + "'></i>"));
-        element.find(".fc-title").after(
-          jQuery("<div><i class='fa fa-clock-o'></i>" + event.start.format(tymfrmt) + "</div><div>" + event.title + "</div> <div><hr id='hr' /></div><div>" + event.client_name + "</div><div>" + event.client_phone + "</div><div>" + event.client_email + "</div>")
-        );
+        element.find(".fc-title").after(jQuery(eventBody));
       } else if (event_st == "CS") {
         element.find(".fc-title").hide();
         element.find(".fc-time").hide();
         element.find(".fc-title").before(jQuery("<i class='fa fa-times-circle-o txt-info' title='" + errorobj_calcelled_by_client + "'></i>"));
-        element.find(".fc-title").after(
-          jQuery("<div><i class='fa fa-clock-o'></i>" + event.start.format(tymfrmt) + "</div><div>" + event.title + "</div> <div><hr id='hr' /></div><div>" + event.client_name + "</div><div>" + event.client_phone + "</div><div>" + event.client_email + "</div>")
-        );
+        element.find(".fc-title").after(jQuery(eventBody));
       } else if (event_st == "CO") {
         element.find(".fc-title").hide();
         element.find(".fc-time").hide();
         element.find(".fc-title").before(jQuery("<i class='fa fa-thumbs-o-up txt-completed' title='" + errorobj_appointment_completed + "'></i>"));
-        element.find(".fc-title").after(
-          jQuery("<div><i class='fa fa-clock-o'></i>" + event.start.format(tymfrmt) + "</div><div>" + event.title + "</div> <div><hr id='hr' /></div><div>" + event.client_name + "</div><div>" + event.client_phone + "</div><div>" + event.client_email + "</div>")
-        );
+        element.find(".fc-title").after(jQuery(eventBody));
       } else if (event_st == "MN") {
         element.find(".fc-title").hide();
         element.find(".fc-time").hide();
         element.find(".fc-title").before(jQuery("<i class='fa fa-thumbs-o-down txt-danger' title='" + errorobj_appointment_marked_as_no_show + "'></i> "));
-        element.find(".fc-title").after(
-          jQuery("<div><i class='fa fa-clock-o'></i>" + event.start.format(tymfrmt) + "</div><div>" + event.title + "</div> <div><hr id='hr' /></div><div>" + event.client_name + "</div><div>" + event.client_phone + "</div><div>" + event.client_email + "</div>")
-        );
+        element.find(".fc-title").after(jQuery(eventBody));
       } else if (event_st == "RS") {
         element.find(".fc-title").hide();
         element.find(".fc-time").hide();
         element.find(".fc-title").before(jQuery("<i class='fa fa-pencil-square-o txt-info' title='" + errorobj_rescheduled + "'></i>"));
-        element.find(".fc-title").after(
-          jQuery("<div><i class='fa fa-clock-o'></i>" + event.start.format(tymfrmt) + "</div><div>" + event.title + "</div> <div><hr id='hr' /></div><div>" + event.client_name + "</div><div>" + event.client_phone + "</div><div>" + event.client_email + "</div>")
-        );
+        element.find(".fc-title").after(jQuery(eventBody));
       } else if (event_st == "GC") {
         element.find(".fc-title").hide();
         element.find(".fc-time").hide();
@@ -1215,6 +1227,18 @@ jQuery(document).ready(function () {
         var ajaxurl = ajax_url;
         var appointment_open_popup = event.open_popup;
         var appointment_id = event.id;
+
+        /* Customer My Appointments: open existing detail modal (cancel/reschedule) */
+        if (typeof ct_customer_calendar !== "undefined" && ct_customer_calendar === true) {
+          var $custModal = jQuery("#user-booking-details" + appointment_id);
+          if ($custModal.length) {
+            $custModal.modal("show");
+          } else {
+            /* Booking created after page load — no server-rendered modal yet */
+            window.location.href = (typeof base_url !== "undefined" ? base_url : "") + "/admin/my-bookings.php";
+          }
+          return false;
+        }
 
         //alert(recurring_id);
         if (!(appointment_open_popup)) {
@@ -1241,95 +1265,140 @@ jQuery(document).ready(function () {
             var app_details = jQuery.parseJSON(response);
             console.log(app_details);
             jQuery("#booking-details-calendar").modal();
+            if (typeof ct_doctor_calendar_readonly !== "undefined" && ct_doctor_calendar_readonly === true) {
+              jQuery("#booking-details-calendar .myeditbookingclass").hide();
+              jQuery("#booking-details-calendar .ct-footer-popup-btn").closest(".modal-footer").hide();
+              jQuery("#booking-details-calendar .ct-footer-popup-btn").hide();
+              jQuery("#booking-details-calendar .save_staff_booking").hide();
+              jQuery("#booking-details-calendar .edit_staff").hide();
+              jQuery("#booking-details-calendar .ct-bd-staff, #booking-details-calendar .assign-app-staff").closest("li").hide();
+              jQuery("#booking-details-calendar .edit_customer_div").hide();
+            }
             if (app_details.change_request_html && app_details.change_request_html != "") {
               jQuery(".ct-change-request-notice").html(app_details.change_request_html).show();
             } else {
               jQuery(".ct-change-request-notice").html("").hide();
             }
-            jQuery(".service-html").html(app_details.service_title);
-            jQuery(".method-html").html(app_details.method_title);
-            jQuery(".units-html").html(app_details.unit_title);
-            jQuery(".addons-html").html(app_details.addons_title);
+            jQuery(".service-html").html((app_details.service_title || "").toString().replace(/^[\s:]+/, ""));
+            jQuery(".method-html").html((app_details.method_title || "").toString().replace(/^[\s:]+/, ""));
+            jQuery(".units-html").html((app_details.unit_title || "").toString().replace(/^[\s:]+/, ""));
+            jQuery(".addons-html").html((app_details.addons_title || "").toString().replace(/^[\s:]+/, ""));
+            /* display:flex !important beats jQuery .hide() — toggle class instead */
+            function ctIsEmptyOrNone(val) {
+              var v = (val || "").toString().replace(/^[\s:]+/, "").trim();
+              return !v || /^none$/i.test(v) || v === "-" || v.toLowerCase() === "n/a";
+            }
+            function ctToggleBdRow($row, val) {
+              if (!$row.length) return;
+              if (ctIsEmptyOrNone(val)) {
+                $row.addClass("ct-bd-hidden");
+              } else {
+                $row.removeClass("ct-bd-hidden");
+              }
+            }
+            ctToggleBdRow(jQuery("#booking-details-calendar .ct-bd-row-method"), app_details.method_title);
+            ctToggleBdRow(jQuery("#booking-details-calendar .ct-bd-row-units"), app_details.unit_title);
+            ctToggleBdRow(jQuery("#booking-details-calendar .ct-bd-row-addons"), app_details.addons_title);
+            /* Booking Details: never show Methods / Units / Addons (service name + price are shown as hero) */
+            jQuery("#booking-details-calendar .ct-bd-row-method, #booking-details-calendar .ct-bd-row-units, #booking-details-calendar .ct-bd-row-addons").addClass("ct-bd-hidden");
+            jQuery("#ct-admin-reject-panel").hide();
+            jQuery("#ct-admin-reject-panel .reject_rea_appt").val("");
+            jQuery("#ct-admin-delete-panel").hide();
+            check_update_if_btn = "0";
+            var $bdStatus = jQuery("#booking-details-calendar .ct-booking-status");
+            $bdStatus.removeClass(function (i, c) {
+              return (c.match(/(^|\s)ct-status-\S+/g) || []).join(" ");
+            });
             if (app_details.booking_status == "A") {
               jQuery(".myconfirmclass").show();
+              jQuery(".myrescheduleclass").show();
               jQuery(".confirm_btn_appt").show();
               jQuery(".reject_btn_appt").show();
               jQuery(".myrejectclass").show();
               jQuery(".mycompleteclass").hide();
-              jQuery(".ct-booking-status").html("<em>" + errorobj_active + "</em>");
+              $bdStatus.addClass("ct-status-A").html("<i class='fa fa-info-circle'></i><em>" + errorobj_pending + "</em>");
             } else if (app_details.booking_status == "C") {
-              jQuery(".ct-booking-status").html("<i class='fa fa-check txt-success' title='" + errorobj_confirmed + "'><em>" + errorobj_confirmed + "</em></i>");
+              $bdStatus.addClass("ct-status-C").html("<i class='fa fa-check'></i><em>" + errorobj_confirmed + "</em>");
               jQuery(".myconfirmclass").hide();
               jQuery(".confirm_btn_appt").hide();
-              jQuery(".reject_btn_appt").hide();
-              jQuery(".myrejectclass").hide();
+              jQuery(".reject_btn_appt").show();
+              jQuery(".myrejectclass").show();
+              jQuery(".myrescheduleclass").show();
               jQuery(".mycompleteclass").show();
             } else if (app_details.booking_status == "R") {
               jQuery(".myrejectclass").hide();
-              jQuery(".ct-booking-status").html("<i class='fa fa-ban txt-danger' title='" + errorobj_rejected + "'><em>" + errorobj_rejected + "</em></i>");
+              jQuery(".myrescheduleclass").hide();
+              $bdStatus.addClass("ct-status-R").html("<i class='fa fa-ban'></i><em>" + errorobj_rejected + "</em>");
               jQuery(".reject_btn_appt").hide();
               jQuery(".confirm_btn_appt").hide();
               jQuery(".myconfirmclass").hide();
               jQuery(".mycompleteclass").hide();
             } else if (app_details.booking_status == "RS") {
-              jQuery(".ct-booking-status").html("<i class='fa fa-pencil-square-o txt-info' title='" + errorobj_rescheduled + "'><em>" + errorobj_rescheduled + "</em></i>");
+              $bdStatus.addClass("ct-status-RS").html("<i class='fa fa-pencil-square-o'></i><em>" + errorobj_rescheduled + "</em>");
               jQuery(".myconfirmclass").show();
+              jQuery(".myrescheduleclass").show();
               jQuery(".confirm_btn_appt").show();
               jQuery(".reject_btn_appt").show();
               jQuery(".myrejectclass").show();
               jQuery(".mycompleteclass").hide();
             } else if (app_details.booking_status == "CC") {
-              jQuery(".ct-booking-status").html("<i class='fa fa-times txt-primary' title='" + errorobj_cancel_by_client + "'><em>" + errorobj_cancel_by_client + "</em></i>");
+              $bdStatus.addClass("ct-status-CC").html("<i class='fa fa-times'></i><em>" + errorobj_cancelled_by_client + "</em>");
               jQuery(".myconfirmclass").hide();
+              jQuery(".myrescheduleclass").hide();
               jQuery(".confirm_btn_appt").hide();
               jQuery(".reject_btn_appt").hide();
               jQuery(".myrejectclass").hide();
-              jQuery(".mycompleteclass").show();
+              jQuery(".mycompleteclass").hide();
             } else if (app_details.booking_status == "CS") {
-              jQuery(".ct-booking-status").html("<i class='fa fa-times-circle-o txt-info' title='" + errorobj_cancelled_by_service_provider + "'><em>" + errorobj_cancelled_by_service_provider + "</em></i>");
+              $bdStatus.addClass("ct-status-CS").html("<i class='fa fa-times-circle-o'></i><em>" + errorobj_cancelled_by_service_provider + "</em>");
               jQuery(".myconfirmclass").hide();
+              jQuery(".myrescheduleclass").hide();
               jQuery(".confirm_btn_appt").hide();
               jQuery(".reject_btn_appt").hide();
               jQuery(".myrejectclass").hide();
               jQuery(".mycompleteclass").hide();
             } else if (app_details.booking_status == "CO") {
-              jQuery(".ct-booking-status").html("<i class='fa fa-thumbs-o-up txt-success' title='" + errorobj_appointment_completed + "'><em>" + errorobj_appointment_completed + "</em></i>");
+              var completedLabel = (typeof errorobj_completed !== "undefined" && errorobj_completed) ? errorobj_completed : errorobj_appointment_completed;
+              $bdStatus.addClass("ct-status-CO").html("<i class='fa fa-thumbs-o-up'></i><em>" + completedLabel + "</em>");
               jQuery(".myconfirmclass").hide();
+              jQuery(".myrescheduleclass").hide();
               jQuery(".confirm_btn_appt").hide();
               jQuery(".reject_btn_appt").hide();
               jQuery(".myrejectclass").hide();
               jQuery(".mycompleteclass").hide();
             } else {
-              jQuery(".ct-booking-status").html("<i class='fa fa-thumbs-o-down txt-danger' title='" + errorobj_appointment_marked_as_no_show + "'><em>" + errorobj_appointment_marked_as_no_show + "</em></i>");
+              $bdStatus.addClass("ct-status-NS").html("<i class='fa fa-thumbs-o-down'></i><em>" + errorobj_appointment_marked_as_no_show + "</em>");
               jQuery(".myconfirmclass").hide();
+              jQuery(".myrescheduleclass").hide();
               jQuery(".confirm_btn_appt").hide();
               jQuery(".reject_btn_appt").hide();
               jQuery(".myrejectclass").hide();
               jQuery(".mycompleteclass").hide();
             }
-            jQuery(".price").html(app_details.booking_price);
-            jQuery(".duration").html(app_details.service_duration);
+            jQuery(".price").html((app_details.booking_price || "").toString().replace(/^[\s:]+/, ""));
+            jQuery(".duration").html((app_details.service_duration || "").toString().replace(/^[\s:]+/, ""));
 
             if (app_details.client_name == "") {
-              jQuery(".client_name").parent("li").hide();
+              jQuery(".client_name").closest("li").addClass("ct-bd-hidden");
             } else {
-              jQuery(".client_name").parent("li").show();
-              jQuery(".client_name").html(app_details.client_name);
+              jQuery(".client_name").closest("li").removeClass("ct-bd-hidden");
+              jQuery(".client_name").html((app_details.client_name || "").toString().replace(/^[\s:]+/, ""));
             }
             jQuery(".client_display").attr("value", app_details.client_name);
-            jQuery(".client_email").html(app_details.client_email);
+            jQuery(".client_email").html((app_details.client_email || "").toString().replace(/^[\s:]+/, ""));
             jQuery(".client_email_dis").attr("value", app_details.client_email);
             if (app_details.client_phone == "") {
-              jQuery(".client_phone").parent("li").hide();
+              jQuery(".client_phone").closest("li").addClass("ct-bd-hidden");
             } else {
-              jQuery(".client_phone").parent("li").show();
-              jQuery(".client_phone").html(app_details.client_phone);
+              jQuery(".client_phone").closest("li").removeClass("ct-bd-hidden");
+              jQuery(".client_phone").html((app_details.client_phone || "").toString().replace(/^[\s:]+/, ""));
             }
             if (app_details.client_address == "") {
-              jQuery(".client_address").parent("li").hide();
+              jQuery(".client_address").closest("li").addClass("ct-bd-hidden");
             } else {
-              jQuery(".client_address").parent("li").show();
-              var add_on_map = '<a href="http://maps.google.com/?q=' + app_details.client_address + '" id="address_on_map1" class="address_on_map1" data-toggle="modal1" lat="" lng="" target="_blank">' + app_details.client_address + '</a>';
+              jQuery(".client_address").closest("li").removeClass("ct-bd-hidden");
+              var cleanAddress = (app_details.client_address || "").toString().replace(/^[\s:]+/, "");
+              var add_on_map = '<a href="http://maps.google.com/?q=' + cleanAddress + '" id="address_on_map1" class="address_on_map1" data-toggle="modal1" lat="" lng="" target="_blank">' + cleanAddress + '</a>';
               jQuery(".client_address").html(add_on_map);
             }
             jQuery(".client_phone_dis").attr("value", app_details.client_phone);
@@ -1338,35 +1407,28 @@ jQuery(document).ready(function () {
             jQuery(".start_time_ser option:selected").text(app_details.appointment_start_time);
             jQuery(".start_time").html(app_details.appointment_start_time);
             jQuery(".update_cal_events").attr("data-id", app_details.id);
-            jQuery(".book_rejct").attr("data-bkid", app_details.id);
+            jQuery("#ct-reject-appointment-cal-popup").attr("data-bkid", app_details.id).attr("data-id", app_details.id);
             jQuery(".confirm_book").attr("data-id", app_details.id);
             jQuery(".rescedual_book").attr("data-id", app_details.id);
-            jQuery("#ct-reject-appointment-cal-popup").attr("data-id", app_details.id);
-            jQuery(".reject_bookings").attr("data-id", app_details.id);
+            jQuery("#booking-details-calendar .reject_bookings").attr("data-id", app_details.id);
             jQuery(".ct-reschedual-appointment-cal").attr("data-id", app_details.id);
-            jQuery(".reject_rea_appt").attr("id", "reason_reject" + app_details.id);
+            jQuery("#ct-admin-reject-panel .reject_rea_appt").attr("id", "reason_reject" + app_details.id);
             jQuery(".book_cancel").attr("data-id", app_details.id);
             jQuery(".book_cancel").attr("data-bkid", app_details.id);
             jQuery(".reason_dis_cancel").attr("id", "reason_delete" + app_details.id);
-            jQuery(".delete_bookings").attr("data-id", app_details.id);
-            jQuery(".delete_bookingss").attr("data-id1", app_details.recurring_id);
-            jQuery(".mybtndelete_bookings").attr("data-id1", app_details.recurring_id);
-            jQuery(".delete_bookings").attr("data-gc_event", app_details.gc_event_id);
-            jQuery(".delete_bookingss").attr("data-gc_event1", app_details.gc_event_id);
-            jQuery(".reject_bookings").attr("data-gc_event", app_details.gc_event_id);
-            jQuery(".delete_bookings").attr("data-gc_staff_event", app_details.gc_staff_event_id);
-            jQuery(".delete_bookingss").attr("data-gc_staff_event1", app_details.gc_staff_event_id);
-            jQuery(".reject_bookings").attr("data-gc_staff_event", app_details.gc_staff_event_id);
-            jQuery(".delete_bookings").attr("data-pid", app_details.staff_ids);
-            jQuery(".delete_bookingss").attr("data-pid1", app_details.staff_ids);
-            jQuery(".reject_bookings").attr("data-pid", app_details.staff_ids);
-            if (app_details.recurrence_status == "Y") {
-              jQuery(".del_all_recurrence").show();
-            } else {
-              jQuery(".del_all_recurrence").hide();
-            }
+            jQuery("#booking-details-calendar .delete_bookings").attr({
+              "data-id": app_details.id,
+              "data-gc_event": app_details.gc_event_id || "",
+              "data-gc_staff_event": app_details.gc_staff_event_id || "",
+              "data-pid": app_details.staff_ids || ""
+            });
+            jQuery("#booking-details-calendar .reject_bookings").attr("data-gc_event", app_details.gc_event_id);
+            jQuery("#booking-details-calendar .reject_bookings").attr("data-gc_staff_event", app_details.gc_staff_event_id);
+            jQuery("#booking-details-calendar .reject_bookings").attr("data-pid", app_details.staff_ids);
+            jQuery(".del_all_recurrence").hide();
             if (app_details.past == "Yes") {
               jQuery(".myconfirmclass").hide();
+              jQuery(".myrescheduleclass").hide();
               jQuery(".confirm_btn_appt").hide();
               jQuery(".reject_btn_appt").hide();
               jQuery(".myrejectclass").hide();
@@ -1374,63 +1436,67 @@ jQuery(document).ready(function () {
               jQuery(".myeditbookingclass").hide();
             }
             if (app_details.client_notes == "") {
-              jQuery(".notes").parent("li").hide();
+              jQuery(".notes").closest("li").addClass("ct-bd-hidden");
             } else {
-              jQuery(".notes").parent("li").show();
-              jQuery(".notes").html(app_details.client_notes);
+              jQuery(".notes").closest("li").removeClass("ct-bd-hidden");
+              jQuery(".notes").html((app_details.client_notes || "").toString().replace(/^[\s:]+/, ""));
             }
-            if (app_details.global_vc_status == "Y" && app_details.vaccum_cleaner != " : -") {
-              jQuery(".client_vc_status").html(app_details.vaccum_cleaner);
+            var vcVal = (app_details.vaccum_cleaner || "").toString().replace(/^[\s:]+/, "");
+            var parkVal = (app_details.parking || "").toString().replace(/^[\s:]+/, "");
+            if (app_details.global_vc_status == "Y" && vcVal != "" && vcVal != "-") {
+              jQuery(".client_vc_status").html(vcVal);
+              jQuery(".pop_vc_status").removeClass("ct-bd-hidden");
             } else {
-              jQuery(".pop_vc_status").hide();
+              jQuery(".pop_vc_status").addClass("ct-bd-hidden");
             }
-            if (app_details.global_p_status == "Y" && app_details.parking != " : -") {
-              jQuery(".client_parking").html(app_details.parking);
+            if (app_details.global_p_status == "Y" && parkVal != "" && parkVal != "-") {
+              jQuery(".client_parking").html(parkVal);
+              jQuery(".pop_p_status").removeClass("ct-bd-hidden");
             } else {
-              jQuery(".pop_p_status").hide();
+              jQuery(".pop_p_status").addClass("ct-bd-hidden");
             }
-            jQuery(".client_vc_status").html(app_details.vaccum_cleaner);
-            jQuery(".client_parking").html(app_details.parking);
-            jQuery(".client_payment").html(app_details.payment_type);
-            jQuery(".contact_status").html(app_details.contact_status);
+            jQuery(".client_payment").html((app_details.payment_type || "").toString().replace(/^[\s:]+/, ""));
+            jQuery(".contact_status").html((app_details.contact_status || "").toString().replace(/^[\s:]+/, ""));
             jQuery("#ct-complete-appointment").attr("data-id", app_details.id);
             jQuery(".ct-confirm-appointment").attr("data-id", app_details.id);
             jQuery(".ct-edit-appointment").attr("data-id", app_details.id);
-            if (app_details.payment_type == ": Pay Locally" || app_details.partial_deposit_status == "Yes") {
-              jQuery(".edit-booking").show();
-              jQuery(".edit-booking").attr("data-id", app_details.id);
-            } else {
-              jQuery(".edit-booking").hide();
-            }
+            var payTypeNorm = (app_details.payment_type || "").toString().replace(/^[\s:]+/, "").toLowerCase();
+            /* Edit Booking Detail / Edit Customer removed from Booking Details modal */
+            jQuery("#booking-details-calendar .myeditbookingclass, #booking-details-calendar .edit-booking").hide();
+            jQuery("#booking-details-calendar .edit_customer_div").hide().empty();
             jQuery(".staff_list").html(app_details.staff);
-            jQuery(".edit_customer_div").html(app_details.edit_details);
             var reason_view_status = app_details.reason_view_status;
             var reject_reason = app_details.reject_reason;
             if (reason_view_status == "hide" || reject_reason == "") {
-              jQuery(".li_of_reason").hide();
+              jQuery(".li_of_reason").addClass("ct-bd-hidden");
             } else {
-              jQuery(".li_of_reason").show();
+              jQuery(".li_of_reason").removeClass("ct-bd-hidden");
               jQuery(".reason").html(reject_reason);
             }
             if (app_details.booking_duration == "") {
-              jQuery(".li_of_duration").hide();
+              jQuery(".li_of_duration").addClass("ct-bd-hidden");
             } else {
-              jQuery(".li_of_duration").show();
+              jQuery(".li_of_duration").removeClass("ct-bd-hidden");
               jQuery(".duration").html(app_details.booking_duration);
             }
 
-            jQuery.ajax({
-              type: "post",
-              data: { recurring_id: app_details.recurring_id, 'action': 'delete_all_rec' },
-              url: ajax_url + "booking_ajax.php",
-              success: function (res) {
-                if (res == "Yes") {
-                  jQuery(".del_all_recurrence").show();
-                } else if (res == "No") {
-                  jQuery(".del_all_recurrence").hide();
-                }
+            /* Doctor Appointments page: force view-only (after all status show/hide) */
+            if ((typeof ct_doctor_calendar_readonly !== "undefined" && ct_doctor_calendar_readonly === true) || app_details.readonly === true) {
+              jQuery("#booking-details-calendar .myeditbookingclass, #booking-details-calendar .edit-booking").hide();
+              jQuery("#booking-details-calendar .myconfirmclass, #booking-details-calendar .myrescheduleclass, #booking-details-calendar .myrejectclass, #booking-details-calendar .mycompleteclass").hide();
+              jQuery("#booking-details-calendar .confirm_btn_appt, #booking-details-calendar .reject_btn_appt").hide();
+              jQuery("#booking-details-calendar .ct-footer-popup-btn").closest(".modal-footer").hide();
+              jQuery("#booking-details-calendar .ct-footer-popup-btn, #booking-details-calendar .save_staff_booking, #booking-details-calendar .edit_staff, #booking-details-calendar .del_all_recurrence").hide();
+              jQuery("#booking-details-calendar .edit_customer_div").hide().empty();
+              jQuery("#booking-details-calendar .ct-bd-staff, #booking-details-calendar .assign-app-staff").closest("li").hide();
+              jQuery("#booking-details-calendar #staff_select").prop("disabled", true);
+              if (jQuery.fn.selectpicker) {
+                jQuery("#booking-details-calendar .selectpicker").selectpicker("refresh");
               }
-            });
+            }
+
+            /* Delete All Recurring feature removed */
+            jQuery(".del_all_recurrence").hide();
 
           }
         });
@@ -1438,6 +1504,12 @@ jQuery(document).ready(function () {
     },
     /*  calendar day click show manual booking  */
     dayClick: function (date, jsEvent, view) {
+      if (typeof ct_doctor_calendar_readonly !== "undefined" && ct_doctor_calendar_readonly === true) {
+        return;
+      }
+      if (typeof ct_customer_calendar !== "undefined" && ct_customer_calendar === true) {
+        return;
+      }
       if (typeof ct_allow_manual_booking !== "undefined" && ct_allow_manual_booking === "N") {
         jQuery(".mainheader_message_fail").show();
         jQuery(".mainheader_message_inner_fail").css("display", "inline");
@@ -1695,12 +1767,82 @@ jQuery(document).ajaxComplete(function () {
       return jQuery("#popover-delete-appointment-cal-popupss1" + recurring_id).html();
     }
   });
-  /* Reject Booking in Dashboard */
-  jQuery(".book_rejct").popover({
+  /* Reject Booking in Dashboard — legacy popover (list pages); skip admin inline toggle */
+  jQuery(".book_rejct").not(".ct-admin-reject-toggle").popover({
     html: true,
     content: function () {
       var booking_id = jQuery(this).attr("data-bkid");
       return jQuery("#popover-reject-appointment-cal-popup" + booking_id).html();
+    }
+  });
+  /* Ensure admin Rifiuta never uses broken popover-in-modal */
+  try {
+    jQuery("#ct-reject-appointment-cal-popup").popover("destroy");
+  } catch (err) { }
+  try {
+    jQuery(".ct-admin-reject-toggle").popover("destroy");
+  } catch (err2) { }
+  try {
+    jQuery("#ct-delete-appointment-cal-popup").popover("destroy");
+  } catch (err3) { }
+  try {
+    jQuery(".ct-admin-delete-toggle").popover("destroy");
+  } catch (err4) { }
+  /* Admin Booking Details: inline Rifiuta panel (single click, no duplicate handlers) */
+  jQuery(document).off("click.ctAdminRejectToggle", ".ct-admin-reject-toggle").on("click.ctAdminRejectToggle", ".ct-admin-reject-toggle", function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    jQuery("#ct-admin-delete-panel").stop(true, true).slideUp(150);
+    var $panel = jQuery("#ct-admin-reject-panel");
+    if (!$panel.length) {
+      return false;
+    }
+    if ($panel.is(":visible")) {
+      $panel.stop(true, true).slideUp(150);
+    } else {
+      $panel.stop(true, true).slideDown(150);
+      setTimeout(function () {
+        $panel.find(".reject_rea_appt").focus();
+      }, 160);
+    }
+    return false;
+  });
+  jQuery(document).off("click.ctAdminRejectDismiss", ".ct-admin-reject-dismiss").on("click.ctAdminRejectDismiss", ".ct-admin-reject-dismiss", function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    jQuery("#ct-admin-reject-panel").stop(true, true).slideUp(150);
+    return false;
+  });
+  /* Admin Booking Details: inline Delete confirm panel */
+  jQuery(document).off("click.ctAdminDeleteToggle", ".ct-admin-delete-toggle").on("click.ctAdminDeleteToggle", ".ct-admin-delete-toggle", function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    jQuery("#ct-admin-reject-panel").stop(true, true).slideUp(150);
+    var $panel = jQuery("#ct-admin-delete-panel");
+    if (!$panel.length) {
+      return false;
+    }
+    if ($panel.is(":visible")) {
+      $panel.stop(true, true).slideUp(150);
+    } else {
+      $panel.stop(true, true).slideDown(150);
+    }
+    return false;
+  });
+  jQuery(document).off("click.ctAdminDeleteDismiss", ".ct-admin-delete-dismiss").on("click.ctAdminDeleteDismiss", ".ct-admin-delete-dismiss", function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    jQuery("#ct-admin-delete-panel").stop(true, true).slideUp(150);
+    return false;
+  });
+  /* Clean leftover backdrop after admin reschedule modal closes */
+  jQuery(document).on("hidden.bs.modal", "#myModal_reschedual", function () {
+    jQuery(this).empty();
+    if (!jQuery(".modal.in").length) {
+      jQuery(".modal-backdrop").remove();
+      jQuery("body").removeClass("modal-open").css("padding-right", "");
     }
   });
   /*validation  for staff insert form*/
@@ -2350,6 +2492,10 @@ jQuery(document).on("click", ".myserviceaddbtn", function () {
   var color = jQuery(".mycolortag").val();
   var title = jQuery(".myservicetitle").val();
   var desc = jQuery(".myservicedesc").val();
+  var hours = parseInt(jQuery(".myservicehours").val(), 10) || 0;
+  var mins = parseInt(jQuery(".myservicemins").val(), 10) || 0;
+  var duration = (hours * 60) + mins;
+  var price = jQuery(".myserviceprice").val();
   var image = jQuery("#pcasctimagename").val();
   var err_msg = jQuery(".error_image ").text();
   if (err_msg != "") {
@@ -2371,7 +2517,7 @@ jQuery(document).on("click", ".myserviceaddbtn", function () {
   jQuery(".ct-loading-main").show();
   jQuery.ajax({
     type: "post",
-    data: { "color": color, "title": title, "description": desc, "image": image, "operationadd": 1, "status": "D", "position": 0 },
+    data: { "color": color, "title": title, "description": desc, "duration": duration, "price": price, "image": image, "operationadd": 1, "status": "D", "position": 0 },
     url: ajax_url + "service_ajax.php",
     success: function (res) {
       if (parseInt(res) == 1) {
@@ -2397,6 +2543,10 @@ jQuery(document).on("click", ".edtservicebtn", function () {
   var color = jQuery(".edtservicecolor" + i).val();
   var title = jQuery(".edtservicetitle" + i).val();
   var desc = jQuery(".edtservicedesc" + i).val();
+  var hours = parseInt(jQuery(".edtservicehours" + i).val(), 10) || 0;
+  var mins = parseInt(jQuery(".edtservicemins" + i).val(), 10) || 0;
+  var duration = (hours * 60) + mins;
+  var price = jQuery(".edtserviceprice" + i).val();
   var image = jQuery("#pcls" + i + "ctimagename").val();
   var err_msg = jQuery(".error_image ").text();
   if (err_msg != "") {
@@ -2421,7 +2571,7 @@ jQuery(document).on("click", ".edtservicebtn", function () {
   jQuery(".ct-loading-main").show();
   jQuery.ajax({
     type: "post",
-    data: { "id": i, "color": color, "title": title, "description": desc, "image": image, "operationedit": 1, "status": "D", "position": 0 },
+    data: { "id": i, "color": color, "title": title, "description": desc, "duration": duration, "price": price, "image": image, "operationedit": 1, "status": "D", "position": 0 },
     url: ajax_url + "service_ajax.php",
     success: function (res) {
       jQuery(".mainheader_message").show();
@@ -3731,33 +3881,63 @@ jQuery(document).on("click", ".ct-complete-appointment-cal", function (e) {
   });
 });
 /* REJECT BOOKINGS */
-jQuery(document).on("click", ".reject_bookings", function (e) {
-  jQuery(".ct-loading-main").show();
-  if (check_update_if_btn == "0") {
-    check_update_if_btn = "1";
-    e.preventDefault();
-    var booking_id = jQuery(this).attr("data-id");
-    var reject_reason_book = jQuery("#reason_reject" + booking_id).val();
-    var pid = jQuery(this).attr("data-pid");
-    var gc_event_id = jQuery(this).attr("data-gc_event");
-    var gc_staff_event_id = jQuery(this).attr("data-gc_staff_event");
-    var dataString = { order_id: booking_id, pid: pid, gc_event_id: gc_event_id, gc_staff_event_id: gc_staff_event_id, reject_reason_book: reject_reason_book, reject_booking: 1 };
-    jQuery.ajax({
-      type: "POST",
-      url: ajax_url + "my_appoint_ajax.php",
-      data: dataString,
-      success: function (response) {
-        jQuery(".mainheader_message").show();
-        jQuery(".mainheader_message_inner").css("display", "inline");
-        jQuery("#ct_sucess_message").text(errorobj_appointment_booking_rejected);
-        jQuery(".mainheader_message").fadeOut(3000);
-        jQuery("#info_modal_close").trigger("click");
-        jQuery("#updateinfo_modal_close").trigger("click");
-        jQuery(".closesss").trigger("click");
-        location.reload();
-      }
-    });
+jQuery(document).off("click.ctRejectBookings", ".reject_bookings").on("click.ctRejectBookings", ".reject_bookings", function (e) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.stopImmediatePropagation();
+  var $btn = jQuery(this);
+  if ($btn.data("ct-reject-busy")) {
+    return false;
   }
+  var booking_id = $btn.attr("data-id");
+  if (!booking_id) {
+    return false;
+  }
+  var $reason = jQuery("#ct-admin-reject-panel .reject_rea_appt");
+  if (!$reason.length) {
+    $reason = jQuery("#reason_reject" + booking_id);
+  }
+  if (!$reason.length) {
+    $reason = jQuery("#reason_reject");
+  }
+  var reject_reason_book = ($reason.val() || "").toString().trim();
+  if (reject_reason_book === "") {
+    $reason.focus();
+    jQuery(".mainheader_message_fail").show();
+    jQuery(".mainheader_message_inner_fail").css("display", "inline");
+    jQuery("#ct_sucess_message_fail").text(typeof errorobj_please_enter_reject_reason !== "undefined" ? errorobj_please_enter_reject_reason : "Please enter reject reason");
+    jQuery(".mainheader_message_fail").fadeOut(3000);
+    return false;
+  }
+  if (check_update_if_btn != "0") {
+    return false;
+  }
+  check_update_if_btn = "1";
+  $btn.data("ct-reject-busy", 1).prop("disabled", true);
+  jQuery(".ct-loading-main").show();
+  var pid = $btn.attr("data-pid");
+  var gc_event_id = $btn.attr("data-gc_event");
+  var gc_staff_event_id = $btn.attr("data-gc_staff_event");
+  var dataString = { order_id: booking_id, pid: pid, gc_event_id: gc_event_id, gc_staff_event_id: gc_staff_event_id, reject_reason_book: reject_reason_book, reject_booking: 1 };
+  jQuery.ajax({
+    type: "POST",
+    url: ajax_url + "my_appoint_ajax.php",
+    data: dataString,
+    success: function (response) {
+      jQuery(".mainheader_message").show();
+      jQuery(".mainheader_message_inner").css("display", "inline");
+      jQuery("#ct_sucess_message").text(errorobj_appointment_booking_rejected);
+      jQuery(".mainheader_message").fadeOut(3000);
+      jQuery("#booking-details-calendar").modal("hide");
+      location.reload();
+    },
+    error: function () {
+      check_update_if_btn = "0";
+      $btn.data("ct-reject-busy", 0).prop("disabled", false);
+      jQuery(".ct-loading-main").hide();
+    }
+  });
+  return false;
 });
 jQuery(document).on("click", ".mybtndelete_booking", function () {
   var order = jQuery(this).attr("data-id");
@@ -3799,28 +3979,98 @@ jQuery(document).on("click", ".mybtndelete_bookings", function () {
     }
   });
 });
-jQuery(document).on("click", ".delete_bookings", function () {
+jQuery(document).off("click.ctDeleteBookings", ".delete_bookings").on("click.ctDeleteBookings", ".delete_bookings", function (e) {
+  e.preventDefault();
+  e.stopPropagation();
+  var $btn = jQuery(this);
+  if ($btn.data("ct-delete-busy")) {
+    return false;
+  }
+  var $trigger = jQuery("#booking-details-calendar #ct-delete-appointment-cal-popup");
+  if (!$trigger.length) {
+    $trigger = jQuery("#ct-delete-appointment-cal-popup");
+  }
+  var order = (
+    $btn.attr("data-id") ||
+    $trigger.attr("data-id") ||
+    $trigger.attr("data-bkid") ||
+    jQuery("#booking-details-calendar .confirm_book").attr("data-id") ||
+    ""
+  ).toString().trim();
+  var gc_event_id = $btn.attr("data-gc_event") || $trigger.attr("data-gc_event") || "";
+  var gc_staff_event_id = $btn.attr("data-gc_staff_event") || "";
+  var pid = $btn.attr("data-pid") || "";
+  if (!order || order === "0") {
+    jQuery(".mainheader_message_fail").show();
+    jQuery(".mainheader_message_inner_fail").css("display", "inline");
+    jQuery("#ct_sucess_message_fail").text("Missing booking id");
+    jQuery(".mainheader_message_fail").fadeOut(4000);
+    return false;
+  }
+  $btn.data("ct-delete-busy", true).prop("disabled", true);
   jQuery(".ct-loading-main").show();
-  var order = jQuery(this).attr("data-id");
-  var gc_event_id = jQuery(this).attr("data-gc_event");
-  var gc_staff_event_id = jQuery(this).attr("data-gc_staff_event");
-  var pid = jQuery(this).attr("data-pid");
+  var deleteUrl = (typeof ajax_url !== "undefined" ? ajax_url : "") + "booking_delete_ajax.php";
   jQuery.ajax({
     type: "POST",
-    data: { id: order, pid: pid, gc_event_id: gc_event_id, gc_staff_event_id: gc_staff_event_id, delete_booking: 1 },
-    url: ajax_url + "my_appoint_ajax.php",
+    dataType: "json",
+    xhrFields: { withCredentials: true },
+    data: {
+      id: order,
+      order_id: order,
+      pid: pid,
+      gc_event_id: gc_event_id,
+      gc_staff_event_id: gc_staff_event_id,
+      delete_booking: 1
+    },
+    url: deleteUrl,
     success: function (response) {
-      //return false;
+      jQuery(".ct-loading-main").hide();
+      $btn.data("ct-delete-busy", false).prop("disabled", false);
+      var ok = response && (response.ok === true || response.deleted === true);
+      if (!ok) {
+        var err = (response && response.error) ? response.error : "Delete failed";
+        jQuery(".mainheader_message_fail").show();
+        jQuery(".mainheader_message_inner_fail").css("display", "inline");
+        jQuery("#ct_sucess_message_fail").text(err);
+        jQuery(".mainheader_message_fail").fadeOut(4000);
+        return;
+      }
+      jQuery("#ct-admin-delete-panel").hide();
       jQuery(".mainheader_message").show();
       jQuery(".mainheader_message_inner").css("display", "inline");
-      jQuery("#ct_sucess_message").text(errorobj_booking_deleted);
+      jQuery("#ct_sucess_message").text(typeof errorobj_booking_deleted !== "undefined" ? errorobj_booking_deleted : "Booking deleted");
       jQuery(".mainheader_message").fadeOut(3000);
+      jQuery("#booking-details-calendar").modal("hide");
       jQuery("#info_modal_close").trigger("click");
       jQuery("#updateinfo_modal_close").trigger("click");
       jQuery(".closesss").trigger("click");
-      location.reload();
+      if (jQuery("#calendar").length && jQuery("#calendar").fullCalendar) {
+        jQuery("#calendar").fullCalendar("refetchEvents");
+      }
+      setTimeout(function () {
+        location.reload();
+      }, 400);
+    },
+    error: function (xhr) {
+      jQuery(".ct-loading-main").hide();
+      $btn.data("ct-delete-busy", false).prop("disabled", false);
+      var msg = "Delete failed";
+      try {
+        var parsed = xhr.responseJSON || JSON.parse(xhr.responseText || "{}");
+        if (parsed && parsed.error) {
+          msg = parsed.error;
+        }
+      } catch (ignore) { }
+      if (xhr.status === 403) {
+        msg = "Unauthorized — please re-login as admin";
+      }
+      jQuery(".mainheader_message_fail").show();
+      jQuery(".mainheader_message_inner_fail").css("display", "inline");
+      jQuery("#ct_sucess_message_fail").text(msg);
+      jQuery(".mainheader_message_fail").fadeOut(5000);
     }
   });
+  return false;
 });
 jQuery(document).on("click", ".delete_bookingss", function () {
   jQuery(".ct-loading-main").show();
@@ -5505,6 +5755,10 @@ jQuery(document).on("change", ".exp_cp_date", function () {
   });
 });
 jQuery(document).on("change", ".selected_res_date", function () {
+  /* Admin reschedule modal uses calendar_ajax slot loader below */
+  if (jQuery(this).closest("#myModal_reschedual").length || jQuery(this).closest(".modal").find(".select_res_date_time").length) {
+    return;
+  }
   jQuery.ajax({
     type: "post",
     data: { selected_dates: jQuery(this).val(), staff_id: jQuery(this).attr("data-staffid"), getmytimeslots: 1 },
@@ -7281,78 +7535,133 @@ jQuery(document).on("click", ".ct_deactivate_extension", function (e) {
     }
   });
 });
-/* Reschedule Appointment */
+/* Reschedule Appointment — close details first (like customer Reschedule) */
 jQuery(document).on("click", "#ct-reschedual-appointment", function (e) {
   e.preventDefault();
-  jQuery(".ct-loading-main").show();
+  e.stopPropagation();
   var order_id = jQuery(this).attr("data-id");
+  if (!order_id) {
+    return;
+  }
+  jQuery(".ct-loading-main").show();
   jQuery.ajax({
     type: "POST",
     url: ajax_url + "my_appoint_ajax.php",
     data: { "order_id": order_id, "reschedual_booking_admin": "yes" },
     success: function (res) {
       jQuery(".ct-loading-main").hide();
-      jQuery("#booking-details-calendar #info_modal_close").trigger("click");
-      jQuery("#myModal_reschedual").html(res);
-      jQuery("#myModal_reschedual").modal("show");
+      var html = (res || "").toString();
+      var divPos = html.indexOf("<div");
+      if (divPos > 0) {
+        html = html.substring(divPos);
+      }
+      if (html.indexOf("modal-dialog") === -1) {
+        jQuery(".mainheader_message_fail").show();
+        jQuery(".mainheader_message_inner_fail").css("display", "inline");
+        jQuery("#ct_sucess_message_fail").text("Unable to open reschedule form");
+        jQuery(".mainheader_message_fail").fadeOut(4000);
+        return;
+      }
+      var $details = jQuery("#booking-details-calendar");
+      var opened = false;
+      var openReschedule = function () {
+        if (opened) {
+          return;
+        }
+        opened = true;
+        jQuery(".modal-backdrop").remove();
+        jQuery("body").removeClass("modal-open").css("padding-right", "");
+        jQuery("#myModal_reschedual").html(html);
+        localStorage.setItem("time1", "");
+        try {
+          if (jQuery.fn.selectpicker) {
+            jQuery("#myModal_reschedual .selectpicker").selectpicker();
+          }
+        } catch (err) { }
+        jQuery("#myModal_reschedual").modal({
+          backdrop: "static",
+          keyboard: true,
+          show: true
+        });
+        /* Show date/time immediately and load slots (no Select Date & Time click) */
+        setTimeout(function () {
+          ctAdminLoadRescheduleSlots(jQuery("#myModal_reschedual"));
+        }, 50);
+      };
+      if ($details.hasClass("in") || $details.is(":visible")) {
+        $details.one("hidden.bs.modal", openReschedule);
+        $details.modal("hide");
+        setTimeout(openReschedule, 450);
+      } else {
+        openReschedule();
+      }
+    },
+    error: function () {
+      jQuery(".ct-loading-main").hide();
     }
   });
 });
 /* Edit Appointment */
 jQuery(document).on("click", "#edit_reschedual", function (e) {
-  //jQuery(".ct-loading-main").show();
-  if (check_update_if_btn == "0") {
-    check_update_if_btn = "1";
-    e.preventDefault();
-    var order = jQuery(this).attr("data-order");
-    var notes = jQuery("#rs_notes").val();
-    var dates = jQuery("#expiry_date" + order).val();
-    var extension_js = jQuery("#extension_js").val();
-    if (extension_js == "true") {
-      var gc_event_id = jQuery(this).attr("data-gc_event");
-      var gc_staff_event_id = jQuery(this).attr("data-gc_staff_event");
-      var pid = jQuery(this).attr("data-pid");
-    } else {
-      var gc_event_id = "";
-      var gc_staff_event_id = "";
-      var pid = "";
-    }
-    var times1 = "";
-    if (localStorage.getItem("time1") != "") {
-      times1 = localStorage.getItem("time1");
-    }
-    if (times1 == "") {
-      check_update_if_btn = "0";
-      jQuery(".close").trigger("click");
-      jQuery(".mainheader_message_fail").show();
-      jQuery(".mainheader_message_inner_fail").css("display", "inline");
-      jQuery("#ct_sucess_message_fail").text(errorobj_sorry_we_are_not_available);
-      jQuery(".mainheader_message_fail").fadeOut(3000);
-    } else {
-      jQuery.ajax({
-        type: "post",
-        data: { orderid: order, notes: notes, dates: dates, timess: times1, gc_event_id: gc_event_id, gc_staff_event_id: gc_staff_event_id, pid: pid, user: "admin", reschedulebooking: 1 },
-        url: ajax_url + "user_details_ajax.php",
-        success: function (res) {
-          if (parseInt(jQuery.trim(res)) == 1) {
-            jQuery(".close").trigger("click");
-            jQuery(".mainheader_message").show();
-            jQuery(".mainheader_message_inner").css("display", "inline");
-            jQuery("#ct_sucess_message").text(errorobj_appointment_reschedules_successfully);
-            jQuery(".mainheader_message").fadeOut(3000);
-            location.reload();
-          } else {
-            check_update_if_btn = "0";
-            jQuery(".close").trigger("click");
-            jQuery(".mainheader_message_fail").show();
-            jQuery(".mainheader_message_inner_fail").css("display", "inline");
-            jQuery("#ct_sucess_message_fail").text(errorobj_sorry_we_are_not_available);
-            jQuery(".mainheader_message_fail").fadeOut(3000);
-          }
-        }
-      });
-    }
+  e.preventDefault();
+  if (check_update_if_btn != "0") {
+    return;
   }
+  check_update_if_btn = "1";
+  var order = jQuery(this).attr("data-order");
+  var $modal = jQuery("#myModal_reschedual");
+  var notes = $modal.find("#rs_notes").val();
+  var dates = $modal.find("#expiry_date" + order).val();
+  var extension_js = jQuery("#extension_js").val();
+  if (extension_js == "true") {
+    var gc_event_id = jQuery(this).attr("data-gc_event");
+    var gc_staff_event_id = jQuery(this).attr("data-gc_staff_event");
+    var pid = jQuery(this).attr("data-pid");
+  } else {
+    var gc_event_id = "";
+    var gc_staff_event_id = "";
+    var pid = "";
+  }
+  var times1 = $modal.find(".reschedule-time-slots").val()
+    || $modal.find("#myuser_reschedule_time").val()
+    || $modal.find(".myuser_reschedule_time").val()
+    || localStorage.getItem("time1")
+    || "";
+  if (times1 == "" || times1 == null) {
+    check_update_if_btn = "0";
+    jQuery(".mainheader_message_fail").show();
+    jQuery(".mainheader_message_inner_fail").css("display", "inline");
+    jQuery("#ct_sucess_message_fail").text(errorobj_sorry_we_are_not_available);
+    jQuery(".mainheader_message_fail").fadeOut(3000);
+    return;
+  }
+  localStorage.setItem("time1", times1);
+  jQuery.ajax({
+    type: "post",
+    data: { orderid: order, notes: notes, dates: dates, timess: times1, gc_event_id: gc_event_id, gc_staff_event_id: gc_staff_event_id, pid: pid, user: "admin", reschedulebooking: 1 },
+    url: ajax_url + "user_details_ajax.php",
+    success: function (res) {
+      var raw = jQuery.trim(res || "");
+      var ok = raw === "1" || /(^|[^0-9])1([^0-9]|$)/.test(raw) || raw.slice(-1) === "1";
+      if (ok) {
+        jQuery("#myModal_reschedual").modal("hide");
+        jQuery(".mainheader_message").show();
+        jQuery(".mainheader_message_inner").css("display", "inline");
+        jQuery("#ct_sucess_message").text(errorobj_appointment_reschedules_successfully);
+        jQuery(".mainheader_message").fadeOut(3000);
+        location.reload();
+      } else {
+        check_update_if_btn = "0";
+        jQuery(".mainheader_message_fail").show();
+        jQuery(".mainheader_message_inner_fail").css("display", "inline");
+        jQuery("#ct_sucess_message_fail").text(errorobj_sorry_we_are_not_available);
+        jQuery(".mainheader_message_fail").fadeOut(3000);
+      }
+    },
+    error: function () {
+      check_update_if_btn = "0";
+    }
+  });
 });
 jQuery(document).on("change", ".myservices_methods_one_status", function (event) {
   if (jQuery(this).prop("checked") == true) {
@@ -8806,99 +9115,80 @@ jQuery(document).on("click", "#new_cus_edit_add_admin", function (e) {
   }
 });
 
-jQuery(document).on("click", ".select_res_date_time", function (e) {
-  jQuery('.ct-loading-main').show();
-
-  jQuery(".date_time_selection").show();
-  jQuery(this).css({ 'border-color': '#6399a9', 'background-color': '#6399a9', 'pointer-events': 'none' });
-
-  var staff_id = jQuery("#select_reschedule_staff").val();
-  var selected_date = jQuery('.selected_res_date').val();
-  var cur_date = jQuery('.selected_res_date').attr("data-cur-date");
-  var booked_slot = jQuery('.selected_res_date').attr("data-booked-slot");
-  var order_duration = jQuery(this).attr("data-order-duration");
-  var client_order_id = jQuery(this).attr("data-orderid");
-
+function ctAdminLoadRescheduleSlots($modal, options) {
+  options = options || {};
+  if (!$modal || !$modal.length) {
+    $modal = jQuery("#myModal_reschedual");
+  }
+  var $trigger = $modal.find(".select_res_date_time").first();
+  var $dateInput = $modal.find(".selected_res_date").first();
+  if (!$dateInput.length) {
+    return;
+  }
+  $modal.find(".date_time_selection").removeClass("ct-reschedule-dt-pending").show();
+  if (!$dateInput.attr("data-original-date")) {
+    $dateInput.attr("data-original-date", $dateInput.val());
+  }
+  if (jQuery.fn.datepicker && !$dateInput.data("datepicker")) {
+    $dateInput.datepicker({ format: "yyyy-mm-dd", autoclose: true });
+  }
+  var staff_id = $modal.find("#select_reschedule_staff").val() || $dateInput.attr("data-staffid");
+  var selected_date = $dateInput.val();
+  var originalDate = ($dateInput.attr("data-original-date") || "").toString();
+  var client_order_id = options.forceOrderId != null
+    ? options.forceOrderId
+    : ((selected_date === originalDate) ? ($trigger.attr("data-orderid") || 0) : 0);
+  jQuery(".ct-loading-main").show();
   jQuery.ajax({
-    type: 'post',
+    type: "post",
     data: {
       staff_id: staff_id,
       selected_dates: selected_date,
-      cur_dates: cur_date,
-      booked_slot: booked_slot,
-      order_duration: order_duration,
+      cur_dates: $dateInput.attr("data-cur-date"),
+      booked_slot: $dateInput.attr("data-booked-slot"),
+      order_duration: $trigger.attr("data-order-duration"),
       client_order_id: client_order_id,
-      reschedule: 'yes',
+      reschedule: "yes",
       get_slots: 1
     },
     url: ajax_url + "calendar_ajax.php",
     success: function (res) {
-      /*jQuery('#myuser_reschedule_time').datetimepicker({
-          format: 'HH:mm a',
-      });*/
-      jQuery('.reschedule_slots_booking').html('');
-      jQuery('.reschedule_slots_booking').html(res);
-      jQuery("#res-booking-datetime").show();
-      jQuery('.ct-loading-main').hide();
+      $modal.find(".reschedule_slots_booking").html(res);
+      $modal.find("#res-booking-datetime").show();
+      var t = $modal.find(".reschedule-time-slots").val() || "";
+      if (t) {
+        localStorage.setItem("time1", t);
+      }
+      jQuery(".ct-loading-main").hide();
+    },
+    error: function () {
+      jQuery(".ct-loading-main").hide();
     }
   });
+}
+
+jQuery(document).on("click", ".select_res_date_time", function (e) {
+  e.preventDefault();
+  e.stopPropagation();
+  var $modal = jQuery(this).closest(".modal");
+  if (!$modal.length) {
+    $modal = jQuery("#myModal_reschedual");
+  }
+  ctAdminLoadRescheduleSlots($modal, { forceOrderId: jQuery(this).attr("data-orderid") || 0 });
 });
 
 jQuery(document).on("change", "#select_reschedule_staff", function (e) {
-  jQuery(".date_time_selection").hide();
-  jQuery("#res-booking-datetime").hide();
-  jQuery(".select_res_date_time").css({ 'border-color': '#28a4c9', 'background-color': '#5bc0de', 'pointer-events': 'unset' });
-  jQuery('.all-booked-error').hide();
-  jQuery('.not-available-error').hide();
-});
-
-jQuery(document).on("change", ".selected_res_date", function (e) {
-  jQuery('.ct-loading-main').show();
-
-  var staff_id = jQuery("#select_reschedule_staff").val();
-  var booking_date = jQuery('.selected_res_date').val();
-  var selected_date = jQuery(this).val();
-  if (booking_date == selected_date) {
-    var client_order_id = jQuery(".select_res_date_time").attr("data-orderid");
-  } else {
-    var client_order_id = 0;
+  var $modal = jQuery(this).closest(".modal");
+  if (!$modal.length) {
+    $modal = jQuery("#myModal_reschedual");
   }
-  var cur_date = jQuery(this).attr("data-cur-date");
-  var booked_slot = jQuery(this).attr("data-booked-slot");
-  var order_duration = jQuery(".select_res_date_time").attr("data-order-duration");
-
-  jQuery.ajax({
-    type: 'post',
-    data: {
-      staff_id: staff_id,
-      selected_dates: selected_date,
-      cur_dates: cur_date,
-      booked_slot: booked_slot,
-      order_duration: order_duration,
-      client_order_id: client_order_id,
-      reschedule: 'yes',
-      get_slots: 1
-    },
-    url: ajax_url + "calendar_ajax.php",
-    success: function (res) {
-      jQuery('.reschedule_slots_booking').html('');
-      jQuery('.reschedule_slots_booking').html(res);
-      jQuery("#res-booking-datetime").show();
-      jQuery('.ct-loading-main').hide();
-    }
-  });
+  localStorage.setItem("time1", "");
+  /* Keep date/time visible; reload slots for newly selected staff */
+  ctAdminLoadRescheduleSlots($modal, { forceOrderId: 0 });
 });
 
-jQuery(document).on("change", ".selected_res_date", function () {
-  jQuery.ajax({
-    type: "post",
-    data: { selected_dates: jQuery(this).val(), staff_id: jQuery(this).attr("data-staffid"), getmytimeslots: 1 },
-    url: ajax_url + "user_details_ajax.php",
-    success: function (res) {
-      jQuery(".mytime_slots_booking").html(res);
-      localStorage.setItem("time1", jQuery(".reschedule-time-slots").val());
-    }
-  });
+jQuery(document).on("change", "#myModal_reschedual .selected_res_date", function (e) {
+  ctAdminLoadRescheduleSlots(jQuery("#myModal_reschedual"));
 });
 
 jQuery(document).on("change", ".reschedule-time-slots", function () {
@@ -8976,7 +9266,22 @@ jQuery(document).on("click", ".ct-admin-approve-cancel", function () {
       data: { admin_approve_cancel: 1, order_id: order_id },
       success: function (res) {
         jQuery(".ct-loading-main").hide();
-        location.reload();
+        var r = jQuery.trim(res || "");
+        if (r === "success") {
+          location.reload();
+          return;
+        }
+        jQuery(".mainheader_message_fail").show();
+        jQuery(".mainheader_message_inner_fail").css("display", "inline");
+        jQuery("#ct_sucess_message_fail").text(r === "unauthorized" ? "Unauthorized" : (r === "invalid_request" ? "Invalid cancellation request" : ("Approve cancel failed: " + (r || "unknown"))));
+        jQuery(".mainheader_message_fail").fadeOut(5000);
+      },
+      error: function () {
+        jQuery(".ct-loading-main").hide();
+        jQuery(".mainheader_message_fail").show();
+        jQuery(".mainheader_message_inner_fail").css("display", "inline");
+        jQuery("#ct_sucess_message_fail").text("Approve cancel failed");
+        jQuery(".mainheader_message_fail").fadeOut(5000);
       }
     });
   }
@@ -8994,7 +9299,22 @@ jQuery(document).on("click", ".ct-admin-approve-reschedule", function () {
       data: { admin_approve_reschedule: 1, order_id: order_id, newdate: newdate },
       success: function (res) {
         jQuery(".ct-loading-main").hide();
-        location.reload();
+        var r = jQuery.trim(res || "");
+        if (r === "success") {
+          location.reload();
+          return;
+        }
+        jQuery(".mainheader_message_fail").show();
+        jQuery(".mainheader_message_inner_fail").css("display", "inline");
+        jQuery("#ct_sucess_message_fail").text(r === "unauthorized" ? "Unauthorized" : (r === "invalid_request" ? "Invalid reschedule request" : ("Approve reschedule failed: " + (r || "unknown"))));
+        jQuery(".mainheader_message_fail").fadeOut(5000);
+      },
+      error: function () {
+        jQuery(".ct-loading-main").hide();
+        jQuery(".mainheader_message_fail").show();
+        jQuery(".mainheader_message_inner_fail").css("display", "inline");
+        jQuery("#ct_sucess_message_fail").text("Approve reschedule failed");
+        jQuery(".mainheader_message_fail").fadeOut(5000);
       }
     });
   }
@@ -9011,7 +9331,22 @@ jQuery(document).on("click", ".ct-admin-reject-request", function () {
       data: { admin_reject_request: 1, order_id: order_id },
       success: function (res) {
         jQuery(".ct-loading-main").hide();
-        location.reload();
+        var r = jQuery.trim(res || "");
+        if (r === "success") {
+          location.reload();
+          return;
+        }
+        jQuery(".mainheader_message_fail").show();
+        jQuery(".mainheader_message_inner_fail").css("display", "inline");
+        jQuery("#ct_sucess_message_fail").text(r === "unauthorized" ? "Unauthorized" : ("Dismiss request failed: " + (r || "unknown")));
+        jQuery(".mainheader_message_fail").fadeOut(5000);
+      },
+      error: function () {
+        jQuery(".ct-loading-main").hide();
+        jQuery(".mainheader_message_fail").show();
+        jQuery(".mainheader_message_inner_fail").css("display", "inline");
+        jQuery("#ct_sucess_message_fail").text("Dismiss request failed");
+        jQuery(".mainheader_message_fail").fadeOut(5000);
       }
     });
   }

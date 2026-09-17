@@ -1,7 +1,7 @@
 <?php    
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
 error_reporting(E_ALL);
 
 session_start();
@@ -57,7 +57,9 @@ $objoffbreaks->conn = $conn;
 $obj_offtime = new cleanto_offtimes();
 $obj_offtime->conn = $conn;																			 
 $appointment_detail = array();
-$order_id = $_POST['appointment_id'];
+$order_id = isset($_POST['appointment_id']) ? (int)$_POST['appointment_id'] : 0;
+$is_doctor_readonly = (isset($_SESSION['ct_staffid']) && !isset($_SESSION['ct_adminid']));
+$doctor_staff_id = $is_doctor_readonly ? (int)$_SESSION['ct_staffid'] : 0;
 /*CHECK FOR VC AND PARKING STATUS*/
 $global_vc_status = $settings->get_option('ct_vc_status');
 $global_p_status = $settings->get_option('ct_p_status');
@@ -133,10 +135,27 @@ include(dirname(dirname(dirname(__FILE__))).'/assets/lib/date_translate_array.ph
 
 /* NEW */
 $book_detail = $booking->get_booking_details_appt($order_id);
+if (!$book_detail) {
+	header('HTTP/1.1 404 Not Found');
+	echo json_encode(array('error' => 'Appointment not found'));
+	die();
+}
+
+/* Doctor may only view appointments assigned to them */
+if ($is_doctor_readonly) {
+	$assigned = isset($book_detail['staff_ids']) ? $book_detail['staff_ids'] : '';
+	$assignedIds = array_filter(array_map('intval', explode(',', (string)$assigned)));
+	if (!in_array($doctor_staff_id, $assignedIds, true)) {
+		header('HTTP/1.1 403 Forbidden');
+		echo json_encode(array('error' => 'Forbidden'));
+		die();
+	}
+}
+$appointment_detail['readonly'] = $is_doctor_readonly ? true : false;
 
 $appointment_detail['id'] = $order_id;
 $appointment_detail['recurring_id'] = $book_detail[14];
-$appointment_detail['booking_price'] = " : " . $general->ct_price_format($book_detail[2],$symbol_position,$decimal);
+$appointment_detail['booking_price'] = $general->ct_price_format($book_detail[2],$symbol_position,$decimal);
 $appointment_detail['recurrence_status'] = $book_detail[16];
 $appointment_detail['appointment_starttime'] = str_replace($english_date_array,$selected_lang_label,date($dateformat, strtotime($book_detail[1])));
 if($timeformat == 12){
@@ -190,14 +209,14 @@ while($jj = mysqli_fetch_array($hh)){
 
 // Combine all method titles into a single string SAHIL ADD A CODE.
 $methodname = implode(", ", $method_titles);
-$appointment_detail['method_title'] = ":" . $methodname;
-$appointment_detail['unit_title'] = ":" . $units;
-$appointment_detail['addons_title'] = ":" . $addons;
-$appointment_detail['service_title'] = ":" . $book_detail['service_title'];
+$appointment_detail['method_title'] = $methodname !== '' ? $methodname : (isset($label_language_values['none']) ? $label_language_values['none'] : 'None');
+$appointment_detail['unit_title'] = $units;
+$appointment_detail['addons_title'] = $addons;
+$appointment_detail['service_title'] = $book_detail['service_title'];
 $appointment_detail['gc_event_id'] = $book_detail[9];
 $appointment_detail['gc_staff_event_id'] = $book_detail['gc_staff_event_id'];
 $appointment_detail['staff_ids'] = $book_detail['staff_ids'];
-$appointment_detail['edit_details'] = '<a class="btn btn-primary " href="edit_customer_detail.php?id='.$book_detail['client_id'].'"><i class="fa fa-edit"></i></a>';
+$appointment_detail['edit_details'] = '';
  
 	$ccnames = explode(" ",$book_detail[3]);
 	$cnamess = array_filter($ccnames);
@@ -220,7 +239,7 @@ $appointment_detail['edit_details'] = '<a class="btn btn-primary " href="edit_cu
 	}
 	
 	if($client_first_name !="" || $client_last_name !=""){ 
-		$appointment_detail['client_name'] = " : ".$client_first_name . " ".$client_last_name;
+		$appointment_detail['client_name'] = trim($client_first_name . " ".$client_last_name);
 	}else{
 		$appointment_detail['client_name'] = "";
 	} 
@@ -228,16 +247,39 @@ $appointment_detail['edit_details'] = '<a class="btn btn-primary " href="edit_cu
 
 $fetch_phone =  strlen($book_detail[7]);
 if($fetch_phone >= 6){
-	$appointment_detail['client_phone'] = ": " . $book_detail[7];
+	$appointment_detail['client_phone'] = $book_detail[7];
 }else{
 	$appointment_detail['client_phone'] = "";
 }
-$appointment_detail['client_email'] = ": " . $book_detail[4];
-$temppp= unserialize(base64_decode($book_detail[5]));
-$tem = str_replace('\\','',$temppp);
+$appointment_detail['client_email'] = $book_detail[4];
+$tem = array(
+	'notes' => '',
+	'vc_status' => '-',
+	'p_status' => '-',
+	'address' => '',
+	'city' => '',
+	'state' => '',
+	'zip' => '',
+	'contact_status' => '',
+);
+$personal_raw = isset($book_detail[5]) ? $book_detail[5] : '';
+if ($personal_raw !== '' && $personal_raw !== null) {
+	$decoded = @base64_decode($personal_raw, true);
+	if ($decoded === false) {
+		$decoded = $personal_raw;
+	}
+	$temppp = @unserialize($decoded);
+	if ($temppp === false) {
+		$temppp = @unserialize($personal_raw);
+	}
+	if (is_array($temppp)) {
+		$tem = array_merge($tem, $temppp);
+	}
+}
+$tem = str_replace('\\', '', $tem);
 
 if($tem['notes']!=""){
-	$finalnotes = " : ".$tem['notes'];
+	$finalnotes = $tem['notes'];
 }else{
 	$finalnotes = "";
 }
@@ -271,7 +313,7 @@ if($tem['address']!="" || $tem['city']!="" || $tem['zip']!="" || $tem['state']!=
 	if($tem['zip']!=""){ $app_zip = $tem['zip'].", " ; } 
 	if($tem['state']!=""){ $app_state = $tem['state'] ; } 
 
-	$temper = " : ".$app_address.$app_city.$app_zip.$app_state;
+	$temper = $app_address.$app_city.$app_zip.$app_state;
 	$temss = rtrim($temper,", ");
 	$appointment_detail['client_address'] = $temss;
 
@@ -285,15 +327,15 @@ if($booking_duration != 0){
 	$hours = intval($booking_duration/60);
 	$minutes = fmod( $booking_duration ,60);
 
-	$appointment_detail['booking_duration'] = " : ".$hours." ".$label_language_values['hours']." ".$minutes." ".$label_language_values['minutes'];
+	$appointment_detail['booking_duration'] = $hours." ".$label_language_values['hours']." ".$minutes." ".$label_language_values['minutes'];
 }else{
 	$appointment_detail['booking_duration'] = "";
 }
 
-$appointment_detail['vaccum_cleaner'] = " : ".$final_vc_status;
-$appointment_detail['parking'] = " : ".$final_p_status;
+$appointment_detail['vaccum_cleaner'] = $final_vc_status;
+$appointment_detail['parking'] = $final_p_status;
 $appointment_detail['client_notes'] = $finalnotes;
-$appointment_detail['contact_status'] = ": " . $tem['contact_status'];
+$appointment_detail['contact_status'] = isset($tem['contact_status']) ? $tem['contact_status'] : '';
 $appointment_detail['global_vc_status'] = $global_vc_status;
 $appointment_detail['global_p_status'] = $global_p_status;
 if ($settings->get_option('ct_partial_deposit_status') == 'Y')
@@ -308,48 +350,32 @@ if($payment_status == "pay at venue"){
 }else{
 	$payment_status = ucwords($payment_status);
 }
-$appointment_detail['payment_type'] = ": " . $payment_status;
+$appointment_detail['payment_type'] = $payment_status;
 
 if ($book_detail[0] == 'A') {
-    $status = $label_language_values['active'];
+    $status = $label_language_values['pending'];
 	$appointment_detail['reason_view_status'] = "hide";
 	$appointment_detail['reject_reason'] = "";
 } elseif ($book_detail[0] == 'C') {
-    $status = $label_language_values['confirm'];
+    $status = $label_language_values['confirmed'];
 	$appointment_detail['reason_view_status'] = "hide";
 	$appointment_detail['reject_reason'] = "";
 } elseif ($book_detail[0] == 'R') {
-    $status = $label_language_values['reject'];
+    $status = $label_language_values['rejected'];
 	$appointment_detail['reason_view_status'] = "show";
-	if($book_detail['reject_reason'] != ""){
-		$appointment_detail['reject_reason'] = ": " . $book_detail['reject_reason'];
-	}else{
-		$appointment_detail['reject_reason'] = "";
-	}
+	$appointment_detail['reject_reason'] = !empty($book_detail['reject_reason']) ? $book_detail['reject_reason'] : "";
 } elseif ($book_detail[0] == 'RS') {
     $status = $label_language_values["rescheduled"];
 	$appointment_detail['reason_view_status'] = "show";
-	if($book_detail['reject_reason'] != ""){
-		$appointment_detail['reject_reason'] = ": " . $book_detail['reject_reason'];
-	}else{
-		$appointment_detail['reject_reason'] = "";
-	}
+	$appointment_detail['reject_reason'] = !empty($book_detail['reject_reason']) ? $book_detail['reject_reason'] : "";
 } elseif ($book_detail[0] == 'CC') {
-    $status =$label_language_values['cancel_by_client'];
+    $status =$label_language_values['cancelled_by_client'];
 	$appointment_detail['reason_view_status'] = "show";
-	if($book_detail['reject_reason'] != ""){
-		$appointment_detail['reject_reason'] = ": " . $book_detail['reject_reason'];
-	}else{
-		$appointment_detail['reject_reason'] = "";
-	}
+	$appointment_detail['reject_reason'] = !empty($book_detail['reject_reason']) ? $book_detail['reject_reason'] : "";
 } elseif ($book_detail[0] == 'CS') {
     $status = $label_language_values['cancelled_by_service_provider'];
 	$appointment_detail['reason_view_status'] = "show";
-	if($book_detail['reject_reason'] != ""){
-		$appointment_detail['reject_reason'] = ": " . $book_detail['reject_reason'];
-	}else{
-		$appointment_detail['reject_reason'] = "";
-	}
+	$appointment_detail['reject_reason'] = !empty($book_detail['reject_reason']) ? $book_detail['reject_reason'] : "";
 } elseif ($book_detail[0] == 'CO') {
     $status = $label_language_values['completed'];
 	$appointment_detail['reason_view_status'] = "hide";
@@ -361,7 +387,7 @@ if ($book_detail[0] == 'A') {
 	$appointment_detail['reject_reason'] = "";
 }
 $appointment_detail['booking_status'] = $book_detail[0];
-if($status == "Confirm"){
+if($book_detail[0] == "C"){
     $appointment_detail['hider'] = "c";
 }
 else
@@ -384,7 +410,7 @@ $booking->order_id = $order_id;
 $get_staff_assignid = explode(",",$booking->fetch_staff_of_booking());
 
 $staff_html = "";
-$staff_html .= "<select id='staff_select' class='selectpicker col-md-10' data-live-search='true' multiple data-actions-box='true' data-orderid='".$order_id."'>";
+$staff_html .= "<select id='staff_select' class='selectpicker ct-bd-staff-select' data-live-search='true' multiple data-actions-box='true' data-orderid='".$order_id."'>";
 
 $booking->booking_date_time = $book_detail[1];
 $staff_status = $booking->booked_staff_status();
@@ -479,8 +505,13 @@ foreach($get_staff_services as $staff_details){
 		}
 }
 
-$staff_html .= "</select><a href='javascript:void(0)' data-orderid='".$order_id."' class='save_staff_booking edit_staff btn btn-info'><i class='remove_add_fafa_class fa fa-pencil-square-o'></i></a>";
-$appointment_detail['staff'] = $staff_html;
+$staff_html .= "</select>";
+if ($is_doctor_readonly) {
+	$appointment_detail['staff'] = '';
+} else {
+	$staff_html .= "<a href='javascript:void(0)' data-orderid='".$order_id."' class='save_staff_booking edit_staff btn btn-primary ct-bd-staff-save'>Save</a>";
+	$appointment_detail['staff'] = $staff_html;
+}
 
 $reqCheck = mysqli_query($conn, "SELECT `change_request_status`, `cancel_reason`, `reschedule_reason`, `reschedule_requested_date` FROM `ct_bookings` WHERE `order_id` = " . (int)$order_id . " LIMIT 1");
 $reqRow = $reqCheck ? mysqli_fetch_assoc($reqCheck) : null;
@@ -488,11 +519,19 @@ $changeRequestHtml = "";
 if ($reqRow) {
     if ($reqRow['change_request_status'] === 'CANCEL_REQUESTED') {
         $reason = htmlspecialchars($reqRow['cancel_reason'] ?: 'No reason specified');
-        $changeRequestHtml = "<div class='alert alert-danger' style='margin-top:10px;'><strong><i class='fa fa-exclamation-triangle'></i> Customer Requested Cancellation</strong><br>Reason: {$reason}<br><div style='margin-top:8px;'><button type='button' class='btn btn-xs btn-danger ct-admin-approve-cancel' data-order_id='{$order_id}'>Approve & Cancel Appointment</button> <button type='button' class='btn btn-xs btn-default ct-admin-reject-request' data-order_id='{$order_id}'>Dismiss Request</button></div></div>";
+        if ($is_doctor_readonly) {
+            $changeRequestHtml = "<div class='alert alert-danger' style='margin-top:10px;'><strong><i class='fa fa-exclamation-triangle'></i> Customer Requested Cancellation</strong><br>Reason: {$reason}<br><em>Awaiting Root Admin approval.</em></div>";
+        } else {
+            $changeRequestHtml = "<div class='alert alert-danger' style='margin-top:10px;'><strong><i class='fa fa-exclamation-triangle'></i> Customer Requested Cancellation</strong><br>Reason: {$reason}<br><div style='margin-top:8px;'><button type='button' class='btn btn-xs btn-danger ct-admin-approve-cancel' data-order_id='{$order_id}'>Approve & Cancel Appointment</button> <button type='button' class='btn btn-xs btn-default ct-admin-reject-request' data-order_id='{$order_id}'>Dismiss Request</button></div></div>";
+        }
     } elseif ($reqRow['change_request_status'] === 'RESCHEDULE_REQUESTED') {
         $reqDate = htmlspecialchars($reqRow['reschedule_requested_date']);
         $reason = htmlspecialchars($reqRow['reschedule_reason'] ?: 'No reason specified');
-        $changeRequestHtml = "<div class='alert alert-warning' style='margin-top:10px;'><strong><i class='fa fa-clock-o'></i> Customer Requested Reschedule</strong><br>Proposed Date/Time: <b>{$reqDate}</b><br>Reason: {$reason}<br><div style='margin-top:8px;'><button type='button' class='btn btn-xs btn-success ct-admin-approve-reschedule' data-order_id='{$order_id}' data-newdate='{$reqDate}'>Approve Reschedule</button> <button type='button' class='btn btn-xs btn-default ct-admin-reject-request' data-order_id='{$order_id}'>Dismiss Request</button></div></div>";
+        if ($is_doctor_readonly) {
+            $changeRequestHtml = "<div class='alert alert-warning' style='margin-top:10px;'><strong><i class='fa fa-clock-o'></i> Customer Requested Reschedule</strong><br>Proposed Date/Time: <b>{$reqDate}</b><br>Reason: {$reason}<br><em>Awaiting Root Admin approval.</em></div>";
+        } else {
+            $changeRequestHtml = "<div class='alert alert-warning' style='margin-top:10px;'><strong><i class='fa fa-clock-o'></i> Customer Requested Reschedule</strong><br>Proposed Date/Time: <b>{$reqDate}</b><br>Reason: {$reason}<br><div style='margin-top:8px;'><button type='button' class='btn btn-xs btn-success ct-admin-approve-reschedule' data-order_id='{$order_id}' data-newdate='{$reqDate}'>Approve Reschedule</button> <button type='button' class='btn btn-xs btn-default ct-admin-reject-request' data-order_id='{$order_id}'>Dismiss Request</button></div></div>";
+        }
     }
 }
 $appointment_detail['change_request_html'] = $changeRequestHtml;

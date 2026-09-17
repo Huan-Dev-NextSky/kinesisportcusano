@@ -110,10 +110,11 @@ if ($setting->get_option('kinesis_api_status') === 'Y') {
 										}
 										$objadmin->id = $arr_staff['id'];
 										$staff_read = $objadmin->readone();
-										if ($staff_read[16] == '') {
+										$staff_image = isset($staff_read['image']) ? $staff_read['image'] : '';
+										if ($staff_image == '') {
 											$imagepath = SITE_URL . "assets/images/user.png";
 										} else {
-											$imagepath = SITE_URL . "assets/images/services/" . $staff_read[16];
+											$imagepath = SITE_URL . "assets/images/services/" . $staff_image;
 										}
 									?>
 

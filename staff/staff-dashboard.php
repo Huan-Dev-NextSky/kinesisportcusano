@@ -68,6 +68,39 @@ if (!$staff_id) {
 <?php
 	exit;
 }
+
+/* Doctor Bookings are view-only for staff status / payment — no Accept/Decline */
+if (!function_exists('ct_doctor_staff_status_label')) {
+	function ct_doctor_staff_status_label($status, $label_language_values) {
+		if ($status === 'C') {
+			$txt = isset($label_language_values['accepted']) ? $label_language_values['accepted'] : 'Accepted';
+			return '<span class="label label-success">' . htmlspecialchars($txt) . '</span>';
+		}
+		if ($status === 'A') {
+			$txt = isset($label_language_values['pending']) ? $label_language_values['pending'] : 'Pending';
+			return '<span class="label label-info">' . htmlspecialchars($txt) . '</span>';
+		}
+		if ($status === 'CS' || $status === 'D') {
+			$txt = isset($label_language_values['decline']) ? $label_language_values['decline'] : 'Declined';
+			return '<span class="label label-danger">' . htmlspecialchars($txt) . '</span>';
+		}
+		return '<span class="label label-default">—</span>';
+	}
+}
+if (!function_exists('ct_doctor_payment_status_label')) {
+	function ct_doctor_payment_status_label($payment_details, $label_language_values) {
+		$ps = (is_array($payment_details) && isset($payment_details['payment_status'])) ? $payment_details['payment_status'] : '';
+		if ($ps === 'Completed') {
+			$txt = isset($label_language_values['completed']) ? $label_language_values['completed'] : 'Completed';
+			return '<span class="label label-success">' . htmlspecialchars($txt) . '</span>';
+		}
+		if ($ps !== '') {
+			return '<span class="label label-default">' . htmlspecialchars($ps) . '</span>';
+		}
+		$txt = isset($label_language_values['pending']) ? $label_language_values['pending'] : 'Pending';
+		return '<span class="label label-warning">' . htmlspecialchars($txt) . '</span>';
+	}
+}
 ?>
 <script type="text/javascript">
 jQuery(function ($) {
@@ -190,49 +223,17 @@ jQuery(function ($) {
 														<td><?php echo $order_client_detail[4]; ?></td>
 														<td><?php echo $general->ct_price_format($get_booking_nettotal, $symbol_position, $decimal); ?></td>
 														<td>
-															<?php $rec_status_details = $bookings->readone_bookings_details_by_order_id_s_id();
-															if ($status_insert_id != "") {
-																if ($rec_status_details == 'C') {
-															?>
-																	<a name="" class="btn btn-success ct-btn-width" disabled <?php echo $label_language_values['accepted']; ?>><?php echo $label_language_values['accepted']; ?></a>
-																<?php } else if ($rec_status_details == 'A') {	 ?>
-																	<a id="accept_appointment" data-id="<?php echo $arr_staff['order_id']; ?>" data-idd="<?php echo $status_insert_id; ?>" data-status='C' value="" name="" class="btn btn-info ct-btn-width" type="submit" title="<?php echo $label_language_values['accept']; ?>"><?php echo $label_language_values['accept']; ?></a>
-																	<a id="decline_appointment" data-id="<?php echo $arr_staff['order_id']; ?>" data-idd="<?php echo $status_insert_id; ?>" data-status='CS' value="" name="" class="btn btn-danger ct-btn-width" type="submit" <?php echo $label_language_values['decline']; ?>><?php echo $label_language_values['decline']; ?></a>
-															<?php   }
-															}
+															<?php
+															$rec_status_details = $bookings->readone_bookings_details_by_order_id_s_id();
+															echo ct_doctor_staff_status_label($rec_status_details, $label_language_values);
 															?>
 														</td>
 														<td>
 															<?php
 															$objpayment->order_id = $arr_staff['order_id'];
 															$payment_details = $objpayment->readone_payment_details();
-															if ($payment_details['payment_status'] == 'Completed') {
+															echo ct_doctor_payment_status_label($payment_details, $label_language_values);
 															?>
-																<a name="" class="btn btn-success ct-btn-width" disabled <?php echo $label_language_values['completed']; ?>><?php echo $label_language_values['completed']; ?></a>
-															<?php
-															} elseif ($today_date >= $book_date && $rec_status_details == 'A' && $status_insert_id != "") {
-															?>
-																<a id="payment_status" data-toggle="popover" class="btn btn-info ct-btn-width" rel="popover" data-placement='left'><?php echo $label_language_values['paid']; ?></a>
-															<?php   } elseif ($today_date >= $book_date && $status_insert_id == "") {
-															?>
-																<a id="payment_status" data-toggle="popover" class="btn btn-info ct-btn-width" rel="popover" data-placement='left'><?php echo $label_language_values['paid']; ?></a>
-															<?php
-															}
-
-															?>
-															<div id="popover-delete-servicess" style="display: none;">
-																<div class="arrow"></div>
-																<table class="form-horizontal" cellspacing="0">
-																	<tbody>
-																		<tr>
-																			<td>
-																				<a value="Delete" data-order_id="<?php echo $arr_staff['order_id']; ?>" class="btn btn-danger btn-sm payment-status-button"><?php echo $label_language_values['yes']; ?></a>
-																				<button id="ct-close-popover-delete-service" class="btn btn-default btn-sm" href="javascript:void(0)"><?php echo $label_language_values['cancel']; ?></button>
-																			</td>
-																		</tr>
-																	</tbody>
-																</table>
-															</div>
 														</td>
 														<td>
 															<?php
@@ -328,49 +329,17 @@ jQuery(function ($) {
 														<td><?php echo $order_client_detail[4]; ?></td>
 														<td><?php echo $general->ct_price_format($get_booking_nettotal, $symbol_position, $decimal); ?></td>
 														<td>
-															<?php $rec_status_details = $bookings->readone_bookings_details_by_order_id_s_id();
-															if ($status_insert_id != "") {
-																if ($rec_status_details == 'C') {
-															?>
-																	<a name="" class="btn btn-success ct-btn-width" disabled <?php echo $label_language_values['accepted']; ?>><?php echo $label_language_values['accepted']; ?></a>
-																<?php } else if ($rec_status_details == 'A') {	 ?>
-																	<a id="accept_appointment" data-id="<?php echo $arr_staff['order_id']; ?>" data-idd="<?php echo $status_insert_id; ?>" data-status='C' value="" name="" class="btn btn-info ct-btn-width" type="submit" title="<?php echo $label_language_values['accept']; ?>"><?php echo $label_language_values['accept']; ?></a>
-																	<a id="decline_appointment" data-id="<?php echo $arr_staff['order_id']; ?>" data-idd="<?php echo $status_insert_id; ?>" data-status='CS' value="" name="" class="btn btn-danger ct-btn-width" type="submit" <?php echo $label_language_values['decline']; ?>><?php echo $label_language_values['decline']; ?></a>
-															<?php   }
-															}
+															<?php
+															$rec_status_details = $bookings->readone_bookings_details_by_order_id_s_id();
+															echo ct_doctor_staff_status_label($rec_status_details, $label_language_values);
 															?>
 														</td>
 														<td>
 															<?php
 															$objpayment->order_id = $arr_staff['order_id'];
 															$payment_details = $objpayment->readone_payment_details();
-															if ($payment_details['payment_status'] == 'Completed') {
+															echo ct_doctor_payment_status_label($payment_details, $label_language_values);
 															?>
-																<a name="" class="btn btn-success ct-btn-width" disabled <?php echo $label_language_values['completed']; ?>><?php echo $label_language_values['completed']; ?></a>
-															<?php
-															} elseif ($today_date >= $book_date && $rec_status_details == 'A' && $status_insert_id != "") {
-															?>
-																<a id="payment_status" data-toggle="popover" class="btn btn-info ct-btn-width" rel="popover" data-placement='left'><?php echo $label_language_values['paid']; ?></a>
-															<?php   } elseif ($today_date >= $book_date && $status_insert_id == "") {
-															?>
-																<a id="payment_status" data-toggle="popover" class="btn btn-info ct-btn-width" rel="popover" data-placement='left'><?php echo $label_language_values['paid']; ?></a>
-															<?php
-															}
-
-															?>
-															<div id="popover-delete-servicess" style="display: none;">
-																<div class="arrow"></div>
-																<table class="form-horizontal" cellspacing="0">
-																	<tbody>
-																		<tr>
-																			<td>
-																				<a value="Delete" data-order_id="<?php echo $arr_staff['order_id']; ?>" class="btn btn-danger btn-sm payment-status-button"><?php echo $label_language_values['yes']; ?></a>
-																				<button id="ct-close-popover-delete-service" class="btn btn-default btn-sm" href="javascript:void(0)"><?php echo $label_language_values['cancel']; ?></button>
-																			</td>
-																		</tr>
-																	</tbody>
-																</table>
-															</div>
 														</td>
 														<td>
 															<?php
@@ -457,49 +426,17 @@ jQuery(function ($) {
 														<td><?php echo $order_client_detail[4]; ?></td>
 														<td><?php echo $general->ct_price_format($get_booking_nettotal, $symbol_position, $decimal); ?></td>
 														<td>
-															<?php $rec_status_details = $bookings->readone_bookings_details_by_order_id_s_id();
-															if ($status_insert_id != "") {
-																if ($rec_status_details == 'C') {
-															?>
-																	<a name="" class="btn btn-success ct-btn-width" disabled <?php echo $label_language_values['accepted']; ?>><?php echo $label_language_values['accepted']; ?></a>
-																<?php } else if ($rec_status_details == 'A') {	 ?>
-																	<a id="accept_appointment" data-id="<?php echo $arr_staff['order_id']; ?>" data-idd="<?php echo $status_insert_id; ?>" data-status='C' value="" name="" class="btn btn-info ct-btn-width" type="submit" title="<?php echo $label_language_values['accept']; ?>"><?php echo $label_language_values['accept']; ?></a>
-																	<a id="decline_appointment" data-id="<?php echo $arr_staff['order_id']; ?>" data-idd="<?php echo $status_insert_id; ?>" data-status='CS' value="" name="" class="btn btn-danger ct-btn-width" type="submit" <?php echo $label_language_values['decline']; ?>><?php echo $label_language_values['decline']; ?></a>
-															<?php   }
-															}
+															<?php
+															$rec_status_details = $bookings->readone_bookings_details_by_order_id_s_id();
+															echo ct_doctor_staff_status_label($rec_status_details, $label_language_values);
 															?>
 														</td>
 														<td>
 															<?php
 															$objpayment->order_id = $arr_staff['order_id'];
 															$payment_details = $objpayment->readone_payment_details();
-															if ($payment_details['payment_status'] == 'Completed') {
+															echo ct_doctor_payment_status_label($payment_details, $label_language_values);
 															?>
-																<a name="" class="btn btn-success ct-btn-width" disabled <?php echo $label_language_values['completed']; ?>><?php echo $label_language_values['completed']; ?></a>
-															<?php
-															} elseif ($today_date >= $book_date && $rec_status_details == 'A' && $status_insert_id != "") {
-															?>
-																<a id="payment_status" data-toggle="popover" class="btn btn-info ct-btn-width" rel="popover" data-placement='left'><?php echo $label_language_values['paid']; ?></a>
-															<?php   } elseif ($today_date >= $book_date && $status_insert_id == "") {
-															?>
-																<a id="payment_status" data-toggle="popover" class="btn btn-info ct-btn-width" rel="popover" data-placement='left'><?php echo $label_language_values['paid']; ?></a>
-															<?php
-															}
-
-															?>
-															<div id="popover-delete-servicess" style="display: none;">
-																<div class="arrow"></div>
-																<table class="form-horizontal" cellspacing="0">
-																	<tbody>
-																		<tr>
-																			<td>
-																				<a value="Delete" data-order_id="<?php echo $arr_staff['order_id']; ?>" class="btn btn-danger btn-sm payment-status-button"><?php echo $label_language_values['yes']; ?></a>
-																				<button id="ct-close-popover-delete-service" class="btn btn-default btn-sm" href="javascript:void(0)"><?php echo $label_language_values['cancel']; ?></button>
-																			</td>
-																		</tr>
-																	</tbody>
-																</table>
-															</div>
 														</td>
 														<td>
 															<?php
@@ -1253,310 +1190,234 @@ jQuery(function ($) {
 			/* Payment and Google Calendar Settings removed from Doctor dashboard */
 			?>
 			<div class="company-details tab-pane fade" id="my-profile">
-				<div class="panel panel-default">
-					<div class="panel-heading">
-						<h1 class="panel-title text-left">Doctor Profile</h1>
-					</div>
-					<div class="mt-30">
-						<div class="container-fluid npl npr">
-							<div class="col-lg-2 col-md-2 col-sm-2 col-xs-12">
-								<div class="ct-clean-service-image-uploader">
-									<?php
-									$objadmin->id = $staff_id;
-									$staff_read = $objadmin->readone();
-									if ($staff_read['image'] == '') {
-										$imagepath = SITE_URL . "assets/images/user.png";
-									} else {
-										$imagepath = SITE_URL . "assets/images/services/" . $staff_read['image'];
-									}
-									?>
-									<img data-imagename="" id="pppp<?php echo $staff_id; ?>staffimage" src="<?php echo $imagepath; ?>" class="ct-clean-staff-image br-100" height="100" width="100">
-									<input data-us="pppp<?php echo $staff_id; ?>" class="hide ct-upload-images" type="file" name="" id="ct-upload-imagepppp<?php echo $staff_id; ?>" data-id="<?php echo $staff_id; ?>" />
-									<?php
-									if ($staff_read['image'] == '') {
-									?>
-										<label for="ct-upload-imagepppp<?php echo $staff_id; ?>" class="ct-clean-staff-img-icon-label old_cam_ser<?php echo $staff_id; ?>">
-											<i class="ct-camera-icon-common br-100 fa fa-camera" id="pcls<?php echo $staff_id; ?>camera"></i>
-											<i class="pull-left fa fa-plus-circle fa-2x" id="ctsc<?php echo $staff_id; ?>plus"></i>
-										</label>
-									<?php
-									}
-									?>
-									<label for="ct-upload-imagepppp<?php echo $staff_id; ?>" class="ct-clean-staff-img-icon-label new_cam_ser ser_cam_btn<?php echo $staff_id; ?>" id="ct-upload-imagepppp<?php echo $staff_id; ?>" style="display:none;">
-										<i class="ct-camera-icon-common br-100 fa fa-camera stfp-cam-icon" id="pppp<?php echo $staff_id; ?>camera"></i>
-										<i class="pull-left fa fa-plus-circle fa-2x stfp-add-icon" id="ctsc<?php echo $staff_id; ?>plus"></i>
+				<div class="ct-profile-shell">
+					<?php
+					$objadmin->id = $staff_id;
+					$staff_read = $objadmin->readone();
+					$doc_name = isset($staff_read['fullname']) ? $staff_read['fullname'] : (isset($staff_read[3]) ? $staff_read[3] : '');
+					$doc_email = isset($staff_read['email']) ? $staff_read['email'] : (isset($staff_read[2]) ? $staff_read[2] : '');
+					$doc_phone = isset($staff_read['phone']) ? $staff_read['phone'] : (isset($staff_read[4]) ? $staff_read[4] : '');
+					$doc_address = isset($staff_read['address']) ? $staff_read['address'] : (isset($staff_read[5]) ? $staff_read[5] : '');
+					$doc_city = isset($staff_read['city']) ? $staff_read['city'] : (isset($staff_read[6]) ? $staff_read[6] : '');
+					$doc_state = isset($staff_read['state']) ? $staff_read['state'] : (isset($staff_read[7]) ? $staff_read[7] : '');
+					$doc_zip = isset($staff_read['zip']) ? $staff_read['zip'] : (isset($staff_read[8]) ? $staff_read[8] : '');
+					$doc_country = isset($staff_read['country']) ? $staff_read['country'] : (isset($staff_read[9]) ? $staff_read[9] : '');
+					$doc_desc = isset($staff_read['description']) ? $staff_read['description'] : '';
+					$doc_image = isset($staff_read['image']) ? $staff_read['image'] : '';
+					$doc_enable = isset($staff_read['enable_booking']) ? $staff_read['enable_booking'] : (isset($staff_read[12]) ? $staff_read[12] : 'N');
+					$doc_pass = isset($staff_read['password']) ? $staff_read['password'] : (isset($staff_read[1]) ? $staff_read[1] : '');
+					$doc_id = isset($staff_read['id']) ? $staff_read['id'] : (isset($staff_read[0]) ? $staff_read[0] : $staff_id);
+					if ($doc_image == '') {
+						$imagepath = SITE_URL . "assets/images/user.png";
+					} else {
+						$imagepath = SITE_URL . "assets/images/services/" . $doc_image;
+					}
+					$objrating_review->staff_id = $staff_id;
+					$rating_details = $objrating_review->readall_by_staff_id();
+					$rating_count = 0;
+					$divide_count = 0;
+					if (mysqli_num_rows($rating_details) > 0) {
+						while ($row_rating_details = mysqli_fetch_assoc($rating_details)) {
+							$divide_count++;
+							$rating_count += (float)$row_rating_details['rating'];
+						}
+					}
+					$rating_point = 0;
+					if ($divide_count != 0) {
+						$rating_point = round(($rating_count / $divide_count), 1);
+					}
+					?>
+					<div class="ct-profile-hero">
+						<div class="ct-profile-avatar">
+							<div class="ct-clean-service-image-uploader">
+								<img data-imagename="" id="pppp<?php echo $staff_id; ?>staffimage" src="<?php echo $imagepath; ?>" class="ct-clean-staff-image br-100" height="100" width="100">
+								<input data-us="pppp<?php echo $staff_id; ?>" class="hide ct-upload-images" type="file" name="" id="ct-upload-imagepppp<?php echo $staff_id; ?>" data-id="<?php echo $staff_id; ?>" />
+								<?php if ($doc_image == '') { ?>
+									<label for="ct-upload-imagepppp<?php echo $staff_id; ?>" class="ct-clean-staff-img-icon-label old_cam_ser<?php echo $staff_id; ?>">
+										<i class="ct-camera-icon-common br-100 fa fa-camera" id="pcls<?php echo $staff_id; ?>camera"></i>
+										<i class="pull-left fa fa-plus-circle fa-2x" id="ctsc<?php echo $staff_id; ?>plus"></i>
 									</label>
-									<?php
-									if ($staff_read['image'] !== '') {
-									?>
-										<a id="ct-remove-staff-imagepppp<?php echo $staff_id; ?>" data-pclsid="<?php echo $staff_id; ?>" data-staff_id="<?php echo $staff_id; ?>" class="delete_staff_image pull-left br-100 btn-danger bt-remove-staff-img btn-xs ser_new_del<?php echo $staff_id; ?>" rel="popover" data-placement='left' title="<?php echo $label_language_values['remove_image']; ?>"> <i class="fa fa-trash" title="<?php echo $label_language_values['remove_service_image']; ?>"></i></a>
-									<?php
-									}
-									?>
-									<label><b class="error-service error_image" style="color:red;"></b></label>
-									<div id="popover-ct-remove-staff-imagepppp<?php echo $staff_id; ?>" style="display: none;">
-										<div class="arrow"></div>
-										<table class="form-horizontal" cellspacing="0">
-											<tbody>
-												<tr>
-													<td>
-														<a href="javascript:void(0)" id="staff_del_images" value="Delete" data-staff_id="<?php echo $staff_id; ?>" class="btn btn-danger btn-sm" type="submit"><?php echo $label_language_values['yes']; ?></a>
-														<a href="javascript:void(0)" id="ct-close-popover-staff-image" class="btn btn-default btn-sm" href="javascript:void(0)"><?php echo $label_language_values['cancel']; ?></a>
-													</td>
-												</tr>
-											</tbody>
-										</table>
-									</div><!-- end pop up -->
-								</div>
-								<div id="ct-image-upload-popuppppp<?php echo $staff_id; ?>" class="ct-image-upload-popup modal fade" tabindex="-1" role="dialog">
-									<div class="vertical-alignment-helper">
-										<div class="modal-dialog modal-md vertical-align-center">
-											<div class="modal-content">
-												<div class="modal-header">
-													<div class="col-md-12 col-xs-12">
-														<a data-staff_id="<?php echo $staff_id; ?>" data-us="pppp<?php echo $staff_id; ?>" class="btn btn-success ct_upload_img_staff" data-imageinputid="ct-upload-imagepppp<?php echo $staff_id; ?>" data-id="<?php echo $staff_id; ?>"><?php echo $label_language_values['crop_and_save']; ?></a>
-														<button type="button" class="btn btn-default hidemodal" data-dismiss="modal" aria-hidden="true"><?php echo $label_language_values['cancel']; ?></button>
-													</div>
-												</div>
-												<div class="modal-body">
-													<img id="ct-preview-imgpppp<?php echo $staff_id; ?>" style="width: 100%;" />
-												</div>
-												<div class="modal-footer">
-													<div class="col-md-12 np">
-														<div class="col-md-12 np">
-															<div class="col-md-4 col-xs-12">
-																<label class="pull-left"><?php echo $label_language_values['file_size']; ?></label> <input type="text" class="form-control" id="ppppfilesize<?php echo $staff_id; ?>" name="filesize" />
-															</div>
-															<div class="col-md-4 col-xs-12">
-																<label class="pull-left">H</label> <input type="text" class="form-control" id="pppp<?php echo $staff_id; ?>h" name="h" />
-															</div>
-															<div class="col-md-4 col-xs-12">
-																<label class="pull-left">W</label> <input type="text" class="form-control" id="pppp<?php echo $staff_id; ?>w" name="w" />
-															</div>
-															<!-- hidden crop params -->
-															<input type="hidden" id="pppp<?php echo $staff_id; ?>x1" name="x1" />
-															<input type="hidden" id="pppp<?php echo $staff_id; ?>y1" name="y1" />
-															<input type="hidden" id="pppp<?php echo $staff_id; ?>x2" name="x2" />
-															<input type="hidden" id="pppp<?php echo $staff_id; ?>y2" name="y2" />
-															<input type="hidden" id="pppp<?php echo $staff_id; ?>id" name="id" value="<?php echo $staff_id; ?>" />
-															<input id="ppppctimage<?php echo $staff_id; ?>" type="hidden" name="ctimage" />
-															<input type="hidden" id="recordid" value="<?php echo $staff_id; ?>">
-															<input type="hidden" id="pppp<?php echo $staff_id; ?>ctimagename" class="ppppimg" name="ctimagename" value="<?php echo $staff_read['image']; ?>" />
-															<input type="hidden" id="pppp<?php echo $staff_id; ?>newname" value="staff_" />
-														</div>
-													</div>
-												</div>
-											</div>
-										</div>
-									</div>
+								<?php } ?>
+								<label for="ct-upload-imagepppp<?php echo $staff_id; ?>" class="ct-clean-staff-img-icon-label new_cam_ser ser_cam_btn<?php echo $staff_id; ?>" id="ct-upload-imagepppp<?php echo $staff_id; ?>" style="display:none;">
+									<i class="ct-camera-icon-common br-100 fa fa-camera stfp-cam-icon" id="pppp<?php echo $staff_id; ?>camera"></i>
+									<i class="pull-left fa fa-plus-circle fa-2x stfp-add-icon" id="ctsc<?php echo $staff_id; ?>plus"></i>
+								</label>
+								<?php if ($doc_image !== '') { ?>
+									<a id="ct-remove-staff-imagepppp<?php echo $staff_id; ?>" data-pclsid="<?php echo $staff_id; ?>" data-staff_id="<?php echo $staff_id; ?>" class="delete_staff_image pull-left br-100 btn-danger bt-remove-staff-img btn-xs ser_new_del<?php echo $staff_id; ?>" rel="popover" data-placement='left' title="<?php echo $label_language_values['remove_image']; ?>"> <i class="fa fa-trash" title="<?php echo $label_language_values['remove_service_image']; ?>"></i></a>
+								<?php } ?>
+								<label><b class="error-service error_image" style="color:red;"></b></label>
+								<div id="popover-ct-remove-staff-imagepppp<?php echo $staff_id; ?>" style="display: none;">
+									<div class="arrow"></div>
+									<table class="form-horizontal" cellspacing="0">
+										<tbody>
+											<tr>
+												<td>
+													<a href="javascript:void(0)" id="staff_del_images" value="Delete" data-staff_id="<?php echo $staff_id; ?>" class="btn btn-danger btn-sm" type="submit"><?php echo $label_language_values['yes']; ?></a>
+													<a href="javascript:void(0)" id="ct-close-popover-staff-image" class="btn btn-default btn-sm" href="javascript:void(0)"><?php echo $label_language_values['cancel']; ?></a>
+												</td>
+											</tr>
+										</tbody>
+									</table>
 								</div>
 							</div>
-							<div class="col-lg-10 col-md-10 col-sm-10 col-xs-12 mt-10">
-								<div class="ct-staff-common-table">
-									<form id="staff_update_details">
-										<div class="form-group col-xs-12 col-md-12">
-											<div class="col-xs-4 col-md-2"><label for="ct-member-name"><?php echo $label_language_values['name']; ?> </label></div>
-											<div class="col-xs-8 col-md-10"><input type="text" class="form-control" id="ct-member-name" value="<?php echo $staff_read[3]; ?>" name="u_member_name" /></div>
-										</div>
-										<div class="form-group col-xs-12 col-md-12">
-											<div class="col-xs-4 col-md-2"><label for="ct-member-name"><?php echo $label_language_values['email'] . " " . $label_language_values['address']; ?></label></div>
-											<div class="col-xs-8 col-md-10"><input type="text" class="form-control" id="ct-member-email" readonly value="<?php echo $staff_read[2]; ?>" name="" /></div>
-										</div>
-										<div class="form-group col-xs-12 col-md-12">
-											<div class="col-xs-4 col-md-2"><label for="ct-member-desc"><?php echo $label_language_values['description']; ?></label></div>
-											<div class="col-xs-8 col-md-10"><textarea class="form-control" id="ct-member-desc" name="ct-member-desc"><?php echo $staff_read[11]; ?></textarea></div>
-										</div>
-										<div class="form-group col-xs-12 col-md-12">
-											<div class="col-xs-4 col-md-2"><label for="phone-number"><?php echo $label_language_values['phone']; ?> </label></div>
-											<div class="col-xs-8 col-md-10"><input type="tel" class="form-control" id="phone-number" name="phone-number" value="<?php echo $staff_read[4]; ?>" /></div>
-										</div>
-										<div class="form-group col-xs-12 col-md-12">
-											<div class="col-xs-4 col-md-2"><label for="address"><?php echo $label_language_values['address']; ?></label></div>
-											<div class="col-xs-8 col-md-10">
-												<input type="text" class="form-control" name="ct-member-address" id="ct-member-address" placeholder="Member Street Address" value="<?php echo $staff_read[5]; ?>" />
-											</div>
-										</div>
-										<div class="col-xs-12">
-											<div class="col-xs-12 col-md-6 form-group npl npr">
-												<div class="col-xs-4"><label for="city"><?php echo $label_language_values['city']; ?></label></div>
-												<div class="col-xs-8">
-													<input class="form-control value_city" id="ct-member-city" name="ct-member-city" value="<?php echo $staff_read[6]; ?>" type="text">
-												</div>
-											</div>
-											<div class="col-xs-12 col-md-6 form-group npl npr">
-												<div class="col-xs-4"><label for="state"><?php echo $label_language_values['state']; ?></label></div>
-												<div class="col-xs-8">
-													<input class="form-control value_state" id="ct-member-state" name="ct-member-state" type="text" value="<?php echo $staff_read[7]; ?>">
-												</div>
-											</div>
-										</div>
-										<div class="col-xs-12">
-											<div class="col-xs-12 col-md-6 form-group npl npr">
-												<div class="col-xs-4"><label for="zip"><?php echo $label_language_values['zip']; ?></label></div>
-												<div class="col-xs-8">
-													<input class="form-control value_zip" id="ct-member-zip" name="ct-member-zip" type="text" value="<?php echo $staff_read[8]; ?>">
-												</div>
-											</div>
-											<div class="col-xs-12 col-md-6 form-group npl npr">
-												<div class="col-xs-4"><label for="country"><?php echo $label_language_values['country']; ?></label></div>
-												<div class="col-xs-8">
-													<input class="form-control value_country" id="ct-member-country" name="ct-member-countrys" type="text" value="<?php echo $staff_read[9]; ?>">
-												</div>
-											</div>
-										</div>
-										<!--<div class="col-xs-12">
-											<div class="col-xs-12 col-md-6 form-group npl npr">
-												<div class="col-xs-4"><label for="zip"><?php echo $label_language_values['latitude']; ?></label></div>
-												<div class="col-xs-8">
-													<input class="form-control value_latitude" readonly id="ct-member-latitude" name="ct-member-latitude" type="text" value="<?php echo $staff_read[24]; ?>">
-												</div>
-											</div>
-											<div class="col-xs-12 col-md-6 form-group npl npr">
-												<div class="col-xs-4"><label for="longitude"><?php echo $label_language_values['longitude']; ?></label></div>
-												<div class="col-xs-8">
-													<input class="form-control value_longitude" readonly id="ct-member-longitude" name="ct-member-longitude" type="text" value="<?php echo $staff_read[25]; ?>">
-												</div>
-											</div>
-										</div>-->
-										<?php
-										if($settings->get_option('ct_staff_zipcode') == 'Y'){
-										echo "";
-										}else{
-										?>
-										<div class="col-xs-12">
-											<div class="col-xs-4 col-md-2"><label><?php echo $label_language_values['services']; ?></label></div>
-											<div class="col-xs-8 col-md-10">
-												<div class="form-group">
-													<select class="selectpicker mb-10" id="ct_service_staff" multiple data-size="10" style="display: none;">
-														<option value="" disabled><?php echo $label_language_values['choose_your_service']; ?></option>
-														<?php
-														$getservice = $objservices->getalldata();
-														if($getservice->num_rows > 0){
-															while ($arr = @mysqli_fetch_array($getservice)) {
-																$get_service_assignid = explode(",", $staff_read[17]);
-																if (in_array($arr[0], $get_service_assignid)) {
-																	echo "<option selected='selected' value='" . $arr[0] . "'>" . $arr[1] . "</option>";
-																} else {
-																	echo "<option value='" . $arr[0] . "'>" . $arr[1] . "</option>";
-																}
-															}
-														}
-														?>
-													</select>
-												</div>
-											</div>
-										</div>
-										<?php } ?>
-										<div class="col-xs-12 col-md-6 form-group npl npr" style="display:none">
-											<div class="col-xs-4"><label for="APIUsername"><?php echo "PayPal API Username"; ?></label></div>
-											<div class="col-xs-8">
-												<input class="form-control value_APIUsername" id="APIUsername" name="APIUsername" value="<?php echo $staff_read[19]; ?>" type="text">
-											</div>
-										</div>
+						</div>
+						<div class="ct-profile-hero-meta">
+							<h2><?php echo htmlspecialchars($doc_name !== '' ? $doc_name : 'Doctor'); ?></h2>
+							<p><?php echo htmlspecialchars($doc_email); ?></p>
+							<span class="ct-profile-badge">Doctor</span>
+						</div>
+					</div>
 
-										<div class="col-xs-12 col-md-6 form-group npl npr" style="display:none">
-											<div class="col-xs-4"><label for="APIPassword"><?php echo "PayPal API Password"; ?></label></div>
-											<div class="col-xs-8">
-												<input class="form-control value_APIPassword" id="APIPassword" name="APIPassword" value="<?php echo $staff_read[20]; ?>" type="text">
-											</div>
+					<div id="ct-image-upload-popuppppp<?php echo $staff_id; ?>" class="ct-image-upload-popup modal fade" tabindex="-1" role="dialog">
+						<div class="vertical-alignment-helper">
+							<div class="modal-dialog modal-md vertical-align-center">
+								<div class="modal-content">
+									<div class="modal-header">
+										<div class="col-md-12 col-xs-12">
+											<a data-staff_id="<?php echo $staff_id; ?>" data-us="pppp<?php echo $staff_id; ?>" class="btn btn-success ct_upload_img_staff" data-imageinputid="ct-upload-imagepppp<?php echo $staff_id; ?>" data-id="<?php echo $staff_id; ?>"><?php echo $label_language_values['crop_and_save']; ?></a>
+											<button type="button" class="btn btn-default hidemodal" data-dismiss="modal" aria-hidden="true"><?php echo $label_language_values['cancel']; ?></button>
 										</div>
-
-										<div class="col-xs-12 col-md-6 form-group npl npr" style="display:none">
-											<div class="col-xs-4">
-												<label for="APISignature"><?php echo "PayPal API Signature"; ?></label>
-											</div>
-											<div class="col-xs-8">
-												<input class="form-control value_APISignature" id="APISignature" name="APISignature" value="<?php echo $staff_read[21]; ?>" type="text">
-											</div>
-										</div>
-
-										<div class="col-xs-12 col-md-6 form-group npl npr" style="display:none">
-											<div class="col-xs-4">
-												<label for="enable-booking1">Test Mode</label>
-											</div>
-											<div class="col-xs-8">
-												<input type="checkbox" id="APItestmode" data-toggle="toggle" data-size="small" data-on="<?php echo $label_language_values['yes']; ?>" <?php if ($staff_read[22] == "Y") {
-																																															echo "checked";
-																																														} ?> data-off="<?php echo $label_language_values['no']; ?>" data-onstyle="success" data-offstyle="danger" />
-											</div>
-										</div>
-
-										<div class="col-xs-12">
-											<div class="col-xs-4 col-md-2"><label for="enable-booking1"><?php echo $label_language_values['enable_booking']; ?></label></div>
-											<div class="col-xs-8 col-md-10">
-												<label for="enable-booking1">
-													<input type="checkbox" id="enable-booking1" data-toggle="toggle" data-size="small" data-on="<?php echo $label_language_values['yes']; ?>" <?php if ($staff_read[12] == "Y") {
-																																																	echo "checked";
-																																																} ?> data-off="<?php echo $label_language_values['no']; ?>" data-onstyle="success" data-offstyle="danger" />
-												</label>
-											</div>
-										</div>
-										<div class="col-xs-12 mt-12">
-											<div class="col-xs-4 col-md-2 pt-3"> <label for="enable-booking1">Rating</label> </div>
-											<div class="col-xs-8 col-md-3 pt-3">
-												<?php
-												$objrating_review->staff_id = $staff_id;
-												$rating_details = $objrating_review->readall_by_staff_id();
-												$rating_count = 0;
-												$divide_count = 0;
-												if (mysqli_num_rows($rating_details) > 0) {
-													while ($row_rating_details = mysqli_fetch_assoc($rating_details)) {
-														$divide_count++;
-														$rating_count += (float)$row_rating_details['rating'];
-													}
-												}
-												$rating_point = 0;
-												if ($divide_count != 0) {
-													$rating_point = round(($rating_count / $divide_count), 1);
-												}
-												?>
-												<input id="ratings_staff_display" name="ratings_staff_display" class="rating" data-min="0" data-max="5" data-step="0.1" value="<?php echo $rating_point; ?>" />
-											</div>
-											<div class="col-xs-12 col-md-4 res-text-end"> <a href="javascript:void(0)" id="update_staff_details_staffsection" data-old_schedule_type="" class="btn btn-success ct-btn-width" data-id="<?php echo $staff_read[0]; ?>"><?php echo $label_language_values['save']; ?></a> </div>
-										</div>
-										<div class="col-xs-12 mb-20 pt-12">
-											<div class="col-md-2 hidden-xs"> <label for="enable-booking1"><?php echo $label_language_values['change_password']; ?></label> </div>
-											<!-- <div class="col-xs-6 col-md-4">
-												<a href="javascript:void(0)" id="update_staff_details_staffsection" data-old_schedule_type="" class="btn btn-success ct-btn-width" data-id="<?php echo $staff_read[0]; ?>"><?php echo $label_language_values['save']; ?></a>
-											</div> -->
-											<div class="col-xs-6 col-md-6">
-												<a href="javascript:void(0)" id="change_password_link" class="btn btn-default ct-btn-width"><?php echo $label_language_values['change_password']; ?></a>
-											</div>
-										</div>
-									</form>
-									<div id="staff_password_update">
-										<form id="staff_password_update_form" novalidate="novalidate">
-											<div class="form-group col-xs-12 col-md-12">
-												<div class="col-xs-4 col-md-2"><label for=""><?php echo $label_language_values['old_password']; ?></label></div>
-												<div class="col-xs-8 col-md-10">
-													<input type="password" class="form-control" name="staff_old_password" id="staff_old_password" />
-													<input type="hidden" class="form-control" name="staff_olddb_password" id="staff_olddb_password" value="<?php echo $staff_read[1]; ?>" />
-													<label id="msg_oldps" class="old_pass_msg error"></label>
+									</div>
+									<div class="modal-body">
+										<img id="ct-preview-imgpppp<?php echo $staff_id; ?>" style="width: 100%;" />
+									</div>
+									<div class="modal-footer">
+										<div class="col-md-12 np">
+											<div class="col-md-12 np">
+												<div class="col-md-4 col-xs-12">
+													<label class="pull-left"><?php echo $label_language_values['file_size']; ?></label> <input type="text" class="form-control" id="ppppfilesize<?php echo $staff_id; ?>" name="filesize" />
 												</div>
-											</div>
-											<div class="form-group col-xs-12 col-md-12">
-												<div class="col-xs-4 col-md-2"><label for=""><?php echo $label_language_values['new_password']; ?></label></div>
-												<div class="col-xs-8 col-md-10">
-													<input type="password" class="form-control" name="staff_new_password" id="staff_new_password" />
+												<div class="col-md-4 col-xs-12">
+													<label class="pull-left">H</label> <input type="text" class="form-control" id="pppp<?php echo $staff_id; ?>h" name="h" />
 												</div>
-											</div>
-											<div class="form-group col-xs-12 col-md-12">
-												<div class="col-xs-4 col-md-2"><label for=""><?php echo $label_language_values['retype_new_password']; ?></label></div>
-												<div class="col-xs-8 col-md-10">
-													<input type="password" class="form-control" name="staff_retype_new_password" id="staff_retype_new_password" />
+												<div class="col-md-4 col-xs-12">
+													<label class="pull-left">W</label> <input type="text" class="form-control" id="pppp<?php echo $staff_id; ?>w" name="w" />
 												</div>
+												<input type="hidden" id="pppp<?php echo $staff_id; ?>x1" name="x1" />
+												<input type="hidden" id="pppp<?php echo $staff_id; ?>y1" name="y1" />
+												<input type="hidden" id="pppp<?php echo $staff_id; ?>x2" name="x2" />
+												<input type="hidden" id="pppp<?php echo $staff_id; ?>y2" name="y2" />
+												<input type="hidden" id="pppp<?php echo $staff_id; ?>id" name="id" value="<?php echo $staff_id; ?>" />
+												<input id="ppppctimage<?php echo $staff_id; ?>" type="hidden" name="ctimage" />
+												<input type="hidden" id="recordid" value="<?php echo $staff_id; ?>">
+												<input type="hidden" id="pppp<?php echo $staff_id; ?>ctimagename" class="ppppimg" name="ctimagename" value="<?php echo htmlspecialchars($doc_image); ?>" />
+												<input type="hidden" id="pppp<?php echo $staff_id; ?>newname" value="staff_" />
 											</div>
-											<div class="col-xs-12 mb-20">
-												<div class="col-xs-4 col-md-2"></div>
-												<div class="col-xs-8 col-md-10">
-													<a id="update_staff_password" class="btn btn-success ct-btn-width" data-id="<?php echo $staff_read[0]; ?>"><?php echo $label_language_values['update']; ?></a>
-												</div>
-											</div>
-										</form>
+										</div>
 									</div>
 								</div>
 							</div>
 						</div>
+					</div>
+
+					<form id="staff_update_details">
+						<div class="ct-profile-card">
+							<h3><i class="fa fa-user-md"></i> <?php echo $label_language_values['personal_information']; ?></h3>
+							<div class="ct-profile-grid">
+								<div class="ct-profile-field">
+									<label for="ct-member-name"><?php echo $label_language_values['name']; ?></label>
+									<input type="text" class="form-control" id="ct-member-name" value="<?php echo htmlspecialchars($doc_name); ?>" name="u_member_name" />
+								</div>
+								<div class="ct-profile-field">
+									<label for="ct-member-email"><?php echo $label_language_values['email']; ?></label>
+									<input type="text" class="form-control" id="ct-member-email" readonly value="<?php echo htmlspecialchars($doc_email); ?>" name="" />
+								</div>
+								<div class="ct-profile-field">
+									<label for="phone-number"><?php echo $label_language_values['phone']; ?></label>
+									<input type="tel" class="form-control" id="phone-number" name="phone-number" value="<?php echo htmlspecialchars($doc_phone); ?>" />
+								</div>
+								<div class="ct-profile-field full">
+									<label for="ct-member-desc"><?php echo $label_language_values['description']; ?></label>
+									<textarea class="form-control" id="ct-member-desc" name="ct-member-desc"><?php echo htmlspecialchars($doc_desc); ?></textarea>
+								</div>
+								<div class="ct-profile-field full">
+									<label for="ct-member-address"><?php echo $label_language_values['address']; ?></label>
+									<input type="text" class="form-control" name="ct-member-address" id="ct-member-address" placeholder="Member Street Address" value="<?php echo htmlspecialchars($doc_address); ?>" />
+								</div>
+								<div class="ct-profile-field">
+									<label for="ct-member-city"><?php echo $label_language_values['city']; ?></label>
+									<input class="form-control value_city" id="ct-member-city" name="ct-member-city" value="<?php echo htmlspecialchars($doc_city); ?>" type="text">
+								</div>
+								<div class="ct-profile-field">
+									<label for="ct-member-state"><?php echo $label_language_values['state']; ?></label>
+									<input class="form-control value_state" id="ct-member-state" name="ct-member-state" type="text" value="<?php echo htmlspecialchars($doc_state); ?>">
+								</div>
+								<div class="ct-profile-field">
+									<label for="ct-member-zip"><?php echo $label_language_values['zip']; ?></label>
+									<input class="form-control value_zip" id="ct-member-zip" name="ct-member-zip" type="text" value="<?php echo htmlspecialchars($doc_zip); ?>">
+								</div>
+								<div class="ct-profile-field">
+									<label for="ct-member-country"><?php echo $label_language_values['country']; ?></label>
+									<input class="form-control value_country" id="ct-member-country" name="ct-member-countrys" type="text" value="<?php echo htmlspecialchars($doc_country); ?>">
+								</div>
+								<?php
+								$assigned_services = isset($staff_read['service_ids']) ? $staff_read['service_ids'] : (isset($staff_read[17]) ? $staff_read[17] : '');
+								/* Keep selected services in a hidden select so Save does not clear mappings */
+								?>
+								<select id="ct_service_staff" multiple class="hidden" style="display:none !important;" aria-hidden="true" tabindex="-1">
+									<?php
+									$getservice = $objservices->getalldata();
+									if ($getservice && $getservice->num_rows > 0) {
+										$get_service_assignid = array_filter(array_map('trim', explode(",", (string)$assigned_services)));
+										while ($arr = @mysqli_fetch_array($getservice)) {
+											$svc_id = isset($arr['id']) ? $arr['id'] : $arr[0];
+											if (!in_array((string)$svc_id, $get_service_assignid, true) && !in_array($svc_id, $get_service_assignid, false)) {
+												continue;
+											}
+											echo "<option selected='selected' value='" . htmlspecialchars((string)$svc_id) . "'></option>";
+										}
+									}
+									?>
+								</select>
+								<div class="ct-profile-field" style="display:none">
+									<input class="form-control value_APIUsername" id="APIUsername" name="APIUsername" value="<?php echo isset($staff_read[19]) ? htmlspecialchars($staff_read[19]) : ''; ?>" type="text">
+									<input class="form-control value_APIPassword" id="APIPassword" name="APIPassword" value="<?php echo isset($staff_read[20]) ? htmlspecialchars($staff_read[20]) : ''; ?>" type="text">
+									<input class="form-control value_APISignature" id="APISignature" name="APISignature" value="<?php echo isset($staff_read[21]) ? htmlspecialchars($staff_read[21]) : ''; ?>" type="text">
+									<input type="checkbox" id="APItestmode" <?php if (isset($staff_read[22]) && $staff_read[22] == "Y") { echo "checked"; } ?> />
+									<input class="form-control value_latitude" readonly id="ct-member-latitude" name="ct-member-latitude" type="hidden" value="<?php echo isset($staff_read['latitude']) ? htmlspecialchars($staff_read['latitude']) : (isset($staff_read[24]) ? htmlspecialchars($staff_read[24]) : ''); ?>">
+									<input class="form-control value_longitude" readonly id="ct-member-longitude" name="ct-member-longitude" type="hidden" value="<?php echo isset($staff_read['longitude']) ? htmlspecialchars($staff_read['longitude']) : (isset($staff_read[25]) ? htmlspecialchars($staff_read[25]) : ''); ?>">
+								</div>
+								<div class="ct-profile-field">
+									<label for="enable-booking1"><?php echo $label_language_values['enable_booking']; ?></label>
+									<div>
+										<input type="checkbox" id="enable-booking1" data-toggle="toggle" data-size="small" data-on="<?php echo $label_language_values['yes']; ?>" <?php if ($doc_enable == "Y") { echo "checked"; } ?> data-off="<?php echo $label_language_values['no']; ?>" data-onstyle="success" data-offstyle="danger" />
+									</div>
+								</div>
+								<div class="ct-profile-field">
+									<label>Rating</label>
+									<input id="ratings_staff_display" name="ratings_staff_display" class="rating" data-min="0" data-max="5" data-step="0.1" value="<?php echo $rating_point; ?>" />
+								</div>
+							</div>
+							<div class="ct-profile-actions">
+								<a href="javascript:void(0)" id="update_staff_details_staffsection" data-old_schedule_type="" class="btn btn-success ct-btn-width" data-id="<?php echo $doc_id; ?>"><?php echo $label_language_values['save']; ?></a>
+								<a href="javascript:void(0)" id="change_password_link" class="btn btn-default ct-btn-width"><?php echo $label_language_values['change_password']; ?></a>
+							</div>
+						</div>
+					</form>
+
+					<div id="staff_password_update" class="ct-profile-card" style="display:none;">
+						<h3><i class="fa fa-lock"></i> <?php echo $label_language_values['change_password']; ?></h3>
+						<form id="staff_password_update_form" novalidate="novalidate">
+							<div class="ct-profile-grid">
+								<div class="ct-profile-field full">
+									<label><?php echo $label_language_values['old_password']; ?></label>
+									<input type="password" class="form-control" name="staff_old_password" id="staff_old_password" />
+									<input type="hidden" class="form-control" name="staff_olddb_password" id="staff_olddb_password" value="<?php echo htmlspecialchars($doc_pass); ?>" />
+									<label id="msg_oldps" class="old_pass_msg error"></label>
+								</div>
+								<div class="ct-profile-field">
+									<label><?php echo $label_language_values['new_password']; ?></label>
+									<input type="password" class="form-control" name="staff_new_password" id="staff_new_password" />
+								</div>
+								<div class="ct-profile-field">
+									<label><?php echo $label_language_values['retype_new_password']; ?></label>
+									<input type="password" class="form-control" name="staff_retype_new_password" id="staff_retype_new_password" />
+								</div>
+							</div>
+							<div class="ct-profile-actions">
+								<a id="update_staff_password" class="btn btn-success ct-btn-width" data-id="<?php echo $doc_id; ?>"><?php echo $label_language_values['update']; ?></a>
+							</div>
+						</form>
 					</div>
 				</div>
 			</div>

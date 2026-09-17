@@ -30,7 +30,7 @@ class cleanto_userdetails {
 	public $conn;
 	/*Function for Read Only one data matched with Id*/
 	public function readone(){
-		$query="select * from `".$this->tablename."` where `id`='".$this->id."'";
+		$query="select `id`, `user_email`, `user_pwd`, `first_name`, `last_name`, `phone`, `zip`, `address`, `city`, `state`, `notes`, `vc_status`, `p_status`, `contact_status`, `status`, `usertype`, `cus_dt`, `stripe_id`, `referal_code`, `wallet_amount`, `external_customer_id`, `dob`, `sms_opt_in` from `".$this->tablename."` where `id`='".$this->id."'";
 		$result=mysqli_query($this->conn,$query);
 		$value=mysqli_fetch_row($result);
 		return $value;
@@ -61,7 +61,7 @@ class cleanto_userdetails {
 	}
 	/* GET USER DETAIL FOR MY_APPOINTMENT PAGE */
 	public function get_user_details(){
-		$query="select DISTINCT `b`.`order_id`, `p`.`frequently_discount`, `p`.`recurrence_status`, `p`.`payment_status`, `b`.`booking_date_time`, `b`.`booking_status`, `b`.`reject_reason`, `b`.`change_request_status`, `b`.`cancel_reason`, `b`.`reschedule_reason`, `b`.`reschedule_requested_date`, `s`.`title`,`p`.`net_amount` as `total_payment`,`b`.`gc_event_id`,`b`.`gc_staff_event_id`,`b`.`staff_ids` from `ct_bookings` as `b`,`ct_payments` as `p`,`ct_services` as `s`,`ct_users` as `u` where `b`.`client_id` = `u`.`id` and `b`.`service_id` = `s`.`id` and `b`.`order_id` = `p`.`order_id` and `u`.`id` = $this->id  group by `b`.`order_id` order by `b`.`order_id` desc";
+		$query="select DISTINCT `b`.`order_id`, `p`.`frequently_discount`, `p`.`recurrence_status`, `p`.`payment_status`, `p`.`payment_method`, `b`.`booking_date_time`, `b`.`booking_status`, `b`.`reject_reason`, `b`.`change_request_status`, `b`.`cancel_reason`, `b`.`reschedule_reason`, `b`.`reschedule_requested_date`, `s`.`title`,`p`.`net_amount` as `total_payment`,`b`.`gc_event_id`,`b`.`gc_staff_event_id`,`b`.`staff_ids` from `ct_bookings` as `b`,`ct_payments` as `p`,`ct_services` as `s`,`ct_users` as `u` where `b`.`client_id` = `u`.`id` and `b`.`service_id` = `s`.`id` and `b`.`order_id` = `p`.`order_id` and `u`.`id` = $this->id  group by `b`.`order_id` order by `b`.`order_id` desc";
 		$result=mysqli_query($this->conn,$query);
 		return $result;
 	}

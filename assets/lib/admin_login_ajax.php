@@ -144,7 +144,7 @@ elseif (isset($_POST['action']) && $_POST['action'] == 'staff_reg') {
 	$values = "weekly";
 	$staff_id = $staff_register;
 	$objdayweek_avail->set_schedule_type($values,$staff_id);
-    echo "Staff Register Successfully";
+    echo "Doctor Register Successfully";
   }
 }
 if (isset($_POST['email'])){

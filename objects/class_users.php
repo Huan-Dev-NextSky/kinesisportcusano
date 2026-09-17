@@ -56,7 +56,8 @@ class cleanto_users{
 		return $result;
 	}
 	public function readone(){
-		$query="select * from `".$this->table_name."` where `id`='".$this->user_id."'";
+		/* Legacy numeric indices: [1]=email [3]=first_name … — keep Kinesis cols at end */
+		$query="select `id`, `user_email`, `user_pwd`, `first_name`, `last_name`, `phone`, `zip`, `address`, `city`, `state`, `notes`, `vc_status`, `p_status`, `contact_status`, `status`, `usertype`, `cus_dt`, `stripe_id`, `referal_code`, `wallet_amount`, `external_customer_id`, `dob`, `sms_opt_in` from `".$this->table_name."` where `id`='".$this->user_id."'";
 		$result=mysqli_query($this->conn,$query);
 		$value=mysqli_fetch_array($result);
 		return $value;
@@ -70,27 +71,27 @@ class cleanto_users{
 	}
   /* Function for login users */
 	public function check_login(){
-		$query="select * from `".$this->table_name."` where `user_email`='".$this->existing_username."' and `user_pwd`='".$this->existing_password."' and `status`='E'";
+		$query="select `id`, `user_email`, `user_pwd`, `first_name`, `last_name`, `phone`, `zip`, `address`, `city`, `state`, `notes`, `vc_status`, `p_status`, `contact_status`, `status`, `usertype`, `cus_dt`, `stripe_id`, `referal_code`, `wallet_amount`, `external_customer_id`, `dob`, `sms_opt_in` from `".$this->table_name."` where `user_email`='".$this->existing_username."' and `user_pwd`='".$this->existing_password."' and `status`='E'";
 		$result=mysqli_query($this->conn,$query);
 		$res=mysqli_fetch_row($result);
 		return $res;
 	}
 	/* Function for login users */
 	public function check_login_user(){
-		$query="SELECT * FROM `".$this->table_name."` WHERE `user_email`='".$this->existing_username."' AND `status`='E'";
+		$query="SELECT `id`, `user_email`, `user_pwd`, `first_name`, `last_name`, `phone`, `zip`, `address`, `city`, `state`, `notes`, `vc_status`, `p_status`, `contact_status`, `status`, `usertype`, `cus_dt`, `stripe_id`, `referal_code`, `wallet_amount`, `external_customer_id`, `dob`, `sms_opt_in` FROM `".$this->table_name."` WHERE `user_email`='".$this->existing_username."' AND `status`='E'";
 		$result=mysqli_query($this->conn,$query);
 		$res=mysqli_fetch_row($result);
 		return $res;
 	}
 	/* Function for Display Customer In export page */
 	public function display_customer(){
-		$query = "SELECT * FROM `".$this->table_name."`";
+		$query = "SELECT `id`, `user_email`, `user_pwd`, `first_name`, `last_name`, `phone`, `zip`, `address`, `city`, `state`, `notes`, `vc_status`, `p_status`, `contact_status`, `status`, `usertype`, `cus_dt`, `stripe_id`, `referal_code`, `wallet_amount`, `external_customer_id`, `dob`, `sms_opt_in` FROM `".$this->table_name."`";
 		$result = mysqli_query($this->conn,$query);
 		return $result;
 	}
 	/*  display all customers in customers page in admin pane  */
 	public function readall(){
-		$query = "select * from `".$this->table_name."`";
+		$query = "select `id`, `user_email`, `user_pwd`, `first_name`, `last_name`, `phone`, `zip`, `address`, `city`, `state`, `notes`, `vc_status`, `p_status`, `contact_status`, `status`, `usertype`, `cus_dt`, `stripe_id`, `referal_code`, `wallet_amount`, `external_customer_id`, `dob`, `sms_opt_in` from `".$this->table_name."`";
 		$result=mysqli_query($this->conn,$query);
 		return $result;
 	}
@@ -269,13 +270,13 @@ class cleanto_users{
     $result8 = mysqli_query($this->conn,$query8);
   }
 	public function check_login_process(){
-		$query="SELECT * FROM `".$this->table_name."` WHERE `user_email`='".$this->existing_username."' AND `user_pwd`='".$this->existing_password."' AND `status`='E'";
+		$query="SELECT `id`, `user_email`, `user_pwd`, `first_name`, `last_name`, `phone`, `zip`, `address`, `city`, `state`, `notes`, `vc_status`, `p_status`, `contact_status`, `status`, `usertype`, `cus_dt`, `stripe_id`, `referal_code`, `wallet_amount`, `external_customer_id`, `dob`, `sms_opt_in` FROM `".$this->table_name."` WHERE `user_email`='".$this->existing_username."' AND `user_pwd`='".$this->existing_password."' AND `status`='E'";
 		$result=mysqli_query($this->conn,$query);
 		if(mysqli_num_rows($result) > 0){
 			return $result;
 			die;
 		}
-		$query="SELECT * FROM `".$this->table_name_admin."` WHERE `email`='".$this->existing_username."' AND `password`='".$this->existing_password."'";
+		$query="SELECT `id`, `password`, `email`, `fullname`, `phone`, `address`, `city`, `state`, `zip`, `country`, `role`, `description`, `enable_booking`, `service_commission`, `commision_value`, `schedule_type`, `image`, `service_ids`, `staff_wallet_amount`, `paypal_api_username`, `paypal_api_password`, `paypal_api_signature`, `paypal_test_mode_status`, `revenue_percentage`, `latitude`, `longitude`, `external_employee_id` FROM `".$this->table_name_admin."` WHERE `email`='".$this->existing_username."' AND `password`='".$this->existing_password."'";
 		$result=mysqli_query($this->conn,$query);
 		return $result;
 	}
@@ -325,13 +326,13 @@ class cleanto_users{
 		return $result;
 	}
 	public function get_client_details(){
-		$query = "SELECT * FROM `".$this->table_name."` WHERE id = ".$this->user_id." ";
+		$query = "SELECT `id`, `user_email`, `user_pwd`, `first_name`, `last_name`, `phone`, `zip`, `address`, `city`, `state`, `notes`, `vc_status`, `p_status`, `contact_status`, `status`, `usertype`, `cus_dt`, `stripe_id`, `referal_code`, `wallet_amount`, `external_customer_id`, `dob`, `sms_opt_in` FROM `".$this->table_name."` WHERE id = ".$this->user_id." ";
 		$result = mysqli_query($this->conn,$query);
 		$data = mysqli_fetch_array($result);
 		return $data;
 	}
 	public function readone_staff($staff_id){
-		$query="select * from `".$this->table_name_admin."` where `id`='".$staff_id."'";
+		$query="select `id`, `password`, `email`, `fullname`, `phone`, `address`, `city`, `state`, `zip`, `country`, `role`, `description`, `enable_booking`, `service_commission`, `commision_value`, `schedule_type`, `image`, `service_ids`, `staff_wallet_amount`, `paypal_api_username`, `paypal_api_password`, `paypal_api_signature`, `paypal_test_mode_status`, `revenue_percentage`, `latitude`, `longitude`, `external_employee_id` from `".$this->table_name_admin."` where `id`='".$staff_id."'";
 		$result=mysqli_query($this->conn,$query);
 		$value=mysqli_fetch_array($result);
 		return $value;

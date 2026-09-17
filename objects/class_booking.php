@@ -103,10 +103,20 @@ class cleanto_booking
             $edate = $end_date . " 23:59:59";
             $date_check = "and `b`.`booking_date_time` between '" . $sdate . "' and '" . $edate . "'";
         }
-        $query = "SELECT DISTINCT `p`.`order_id`, `b`.`booking_status`, `b`.`client_id`, `b`.`booking_date_time`, `s`.`color`, `s`.`title`, `p`.`net_amount` FROM `ct_bookings` as `b`,`ct_services` as `s`,`ct_payments` as `p`
+        $staff_check = "";
+        if (!empty($this->provider_id)) {
+            $pid = (int)$this->provider_id;
+            $staff_check = " and FIND_IN_SET('" . $pid . "', `b`.`staff_ids`) ";
+        }
+        $client_check = "";
+        if (!empty($this->client_id)) {
+            $cid = (int)$this->client_id;
+            $client_check = " and `b`.`client_id` = '" . $cid . "' ";
+        }
+        $query = "SELECT DISTINCT `p`.`order_id`, `b`.`booking_status`, `b`.`client_id`, `b`.`booking_date_time`, `b`.`staff_ids`, `s`.`color`, `s`.`title`, `p`.`net_amount` FROM `ct_bookings` as `b`,`ct_services` as `s`,`ct_payments` as `p`
 		WHERE
 		`b`.`order_id` = `p`.`order_id` and
-		`b`.`service_id` = `s`.`id` " . $date_check . "  GROUP BY `p`.`order_id`, `b`.`booking_status`, `b`.`client_id`, `b`.`booking_date_time`, `s`.`color`, `s`.`title`, `p`.`net_amount` ORDER BY `b`.`order_id` DESC";
+		`b`.`service_id` = `s`.`id` " . $date_check . $staff_check . $client_check . "  GROUP BY `p`.`order_id`, `b`.`booking_status`, `b`.`client_id`, `b`.`booking_date_time`, `b`.`staff_ids`, `s`.`color`, `s`.`title`, `p`.`net_amount` ORDER BY `b`.`order_id` DESC";
         $result = mysqli_query($this->conn, $query);
         return $result;
     }
@@ -300,7 +310,7 @@ class cleanto_booking
     /* Get Client Info from user table */
     public function get_client_info()
     {
-        $query = "select * from `" . $this->tablename3 . "` where `id`='" . $this->client_id . "'";
+        $query = "select `id`, `user_email`, `user_pwd`, `first_name`, `last_name`, `phone`, `zip`, `address`, `city`, `state`, `notes`, `vc_status`, `p_status`, `contact_status`, `status`, `usertype`, `cus_dt`, `stripe_id`, `referal_code`, `wallet_amount`, `external_customer_id`, `dob`, `sms_opt_in` from `" . $this->tablename3 . "` where `id`='" . $this->client_id . "'";
         $result = mysqli_query($this->conn, $query);
         $value = mysqli_fetch_row($result);
         return $value;

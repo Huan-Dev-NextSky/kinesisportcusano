@@ -15,7 +15,12 @@ class AwwApiMigration {
 
         $durCheck = mysqli_query($conn, "SHOW COLUMNS FROM `ct_services` LIKE 'duration'");
         if ($durCheck && mysqli_num_rows($durCheck) === 0) {
-            @mysqli_query($conn, "ALTER TABLE `ct_services` ADD COLUMN `duration` VARCHAR(20) NOT NULL DEFAULT '01:00:00' AFTER `description`");
+            @mysqli_query($conn, "ALTER TABLE `ct_services` ADD COLUMN `duration` INT(11) NOT NULL DEFAULT '60' AFTER `description`");
+        }
+
+        $priceCheck = mysqli_query($conn, "SHOW COLUMNS FROM `ct_services` LIKE 'price'");
+        if ($priceCheck && mysqli_num_rows($priceCheck) === 0) {
+            @mysqli_query($conn, "ALTER TABLE `ct_services` ADD COLUMN `price` DOUBLE NOT NULL DEFAULT '0' AFTER `image`");
         }
 
         // Add kinesis columns to ct_bookings
@@ -39,10 +44,18 @@ class AwwApiMigration {
         // Migrate all staff roles to doctor (System uses Doctor role only)
         @mysqli_query($conn, "UPDATE `ct_admin_info` SET `role` = 'doctor' WHERE `role` = 'staff'");
 
-        // Add external_customer_id, dob, sms_opt_in to ct_users
+        // Add external_customer_id, dob, sms_opt_in to ct_users (separate checks — older DBs may have only external_customer_id)
         $userCol1 = mysqli_query($conn, "SHOW COLUMNS FROM `ct_users` LIKE 'external_customer_id'");
         if ($userCol1 && mysqli_num_rows($userCol1) === 0) {
-            @mysqli_query($conn, "ALTER TABLE `ct_users` ADD COLUMN `external_customer_id` INT(11) NULL DEFAULT NULL AFTER `id`, ADD COLUMN `dob` VARCHAR(50) NULL DEFAULT NULL, ADD COLUMN `sms_opt_in` VARCHAR(10) NOT NULL DEFAULT 'Y', ADD INDEX (`external_customer_id`)");
+            @mysqli_query($conn, "ALTER TABLE `ct_users` ADD COLUMN `external_customer_id` INT(11) NULL DEFAULT NULL AFTER `id`, ADD INDEX (`external_customer_id`)");
+        }
+        $userDob = mysqli_query($conn, "SHOW COLUMNS FROM `ct_users` LIKE 'dob'");
+        if ($userDob && mysqli_num_rows($userDob) === 0) {
+            @mysqli_query($conn, "ALTER TABLE `ct_users` ADD COLUMN `dob` VARCHAR(50) NULL DEFAULT NULL");
+        }
+        $userSms = mysqli_query($conn, "SHOW COLUMNS FROM `ct_users` LIKE 'sms_opt_in'");
+        if ($userSms && mysqli_num_rows($userSms) === 0) {
+            @mysqli_query($conn, "ALTER TABLE `ct_users` ADD COLUMN `sms_opt_in` VARCHAR(10) NOT NULL DEFAULT 'Y'");
         }
 
         // 2. Create ct_gcal_kinesis_sync table for tracking sync events
