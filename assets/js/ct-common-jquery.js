@@ -214,26 +214,28 @@ jQuery(document).ready(function () {
   var state_check = check_state;
   var notes_check = check_notes;
   /* validaition condition*/
+  /* Skip empty stub forms (index_one_step) — .rules() throws without a real field */
+  if (jQuery("#user_details_form").length && jQuery("#user_details_form").find(":input").length) {
   jQuery("#user_details_form").validate();
   if (appoint_details.status == "on") {
-    if (check_addresss.statuss == "on" && check_addresss.required == "Y") {
+    if (check_addresss.statuss == "on" && check_addresss.required == "Y" && jQuery("#app-street-address").length) {
       jQuery("#app-street-address").rules("add",
         {
           required: true, minlength: check_addresss.min, maxlength: check_addresss.max,
           messages: { required: errorobj_req_sa, minlength: errorobj_min_sa, maxlength: errorobj_max_sa }
         });
     }
-    if (check_zip_code.statuss == "on" && check_zip_code.required == "Y") {
+    if (check_zip_code.statuss == "on" && check_zip_code.required == "Y" && jQuery("#app-zip-code").length) {
       jQuery("#app-zip-code").rules("add", { required: true, minlength: check_zip_code.min, maxlength: check_zip_code.max, messages: { required: errorobj_req_zc, minlength: errorobj_min_zc, maxlength: errorobj_max_zc } });
     }
-    if (check_city.statuss == "on" && check_city.required == "Y") {
+    if (check_city.statuss == "on" && check_city.required == "Y" && jQuery("#app-city").length) {
       jQuery("#app-city").rules("add",
         {
           required: true, minlength: check_city.min, maxlength: check_city.max,
           messages: { required: errorobj_req_ct, minlength: errorobj_min_ct, maxlength: errorobj_max_ct }
         });
     }
-    if (check_state.statuss == "on" && check_state.required == "Y") {
+    if (check_state.statuss == "on" && check_state.required == "Y" && jQuery("#app-state").length) {
       jQuery("#app-state").rules("add",
         {
           required: true, minlength: check_state.min, maxlength: check_state.max,
@@ -320,6 +322,7 @@ jQuery(document).ready(function () {
         messages: { required: errorobj_please_enter_email_address, email: errorobj_please_enter_valid_email_address, remote: errorobj_email_already_exists }
       });
   }
+  } /* end user_details_form guard */
   /* end validaition condition*/
   if (jQuery(".guest-user").is(":checked")) {
     jQuery("#ct-email-guest").val("");
@@ -336,11 +339,11 @@ jQuery(document).ready(function () {
     jQuery("#ct-city").val("");
     jQuery("#ct-state").val("");
     jQuery("#ct-notes").val("");
-    jQuery(".ct-new-user-details").show("blind", { direction: "vertical" }, 700);
-    jQuery(".ct-login-existing").hide("blind", { direction: "vertical" }, 300);
-    jQuery(".ct-peronal-details").show("blind", { direction: "vertical" }, 300);
-    jQuery(".remove_preferred_password_and_preferred_email").hide("blind", { direction: "vertical" }, 300);
-    jQuery(".remove_guest_user_preferred_email").show("blind", { direction: "vertical" }, 300);
+    jQuery(".ct-new-user-details").show();
+    jQuery(".ct-login-existing").hide();
+    jQuery(".ct-peronal-details").show();
+    jQuery(".remove_preferred_password_and_preferred_email").hide();
+    jQuery(".remove_guest_user_preferred_email").show();
     if (jQuery(".remove_zip_code_class").hasClass("ct-md-4")) {
       jQuery(".remove_zip_code_class").removeClass("ct-md-4");
       jQuery(".remove_zip_code_class").addClass("ct-md-6");
@@ -359,6 +362,9 @@ jQuery(document).ready(function () {
   jQuery(".special_day").hide();
   var site_url = siteurlObj.site_url;
   var ajax_url = ajaxurlObj.ajax_url;
+  /* Cup24 cards open slots via get_slots only — skip the heavy page-load
+     calendar fetch so the first book click is not blocked by PHP session lock. */
+  if (!jQuery("#ksc-service-cards").length) {
   jQuery.ajax({
     type: "POST",
     url: ajax_url + "calendar_ajax.php",
@@ -378,6 +384,7 @@ jQuery(document).ready(function () {
       cleanto_sidebar_scroll();
     }
   });
+  }
   jQuery.ajax({
     type: "POST",
     url: ajax_url + "front_ajax.php",
@@ -785,8 +792,14 @@ jQuery(document).on("click", "#complete_bookings", function (e) {
   /* console.log(tip_value) */
   /** new **/
   var staff_id = jQuery(".provider_disable:checked").attr("data-staff_id");
-  if (staff_id == undefined) {
-    var staff_id = "";
+  if (staff_id == undefined || staff_id === "") {
+    /* Cup24: provider list is hidden — use Doctor chosen on the slot modal */
+    var kscStaff = jQuery("#ksc_staff_id").val();
+    if (kscStaff) {
+      staff_id = kscStaff;
+    } else {
+      staff_id = "";
+    }
   } else {
     var staff_id = staff_id;
   }
@@ -1184,13 +1197,35 @@ jQuery(document).on("click", "#complete_bookings", function (e) {
               type: "POST",
               url: front_url + "checkout.php",
               data: dataString,
+              timeout: 120000,
               success: function (response) {
-                if (jQuery.trim(response) == "ok") {
-                  jQuery(".ct-loading-main-complete_booking").hide();
+                var r = (response == null ? "" : String(response)).replace(/^\uFEFF/, "").trim();
+                var ok = (r === "ok" || r.slice(-2) === "ok" || /(^|[^a-z])ok([^a-z]|$)/i.test(r));
+                jQuery(".ct-loading-main-complete_booking").hide();
+                if (ok) {
                   window.location = thankyou_page_setting_value;
+                } else {
+                  clicked = false;
+                  var errMsg = r ? r.substring(0, 280) : "Booking failed — empty response";
+                  if (typeof showPopup === "function") {
+                    showPopup();
+                    jQuery(".ct-payment-error").text(errMsg);
+                  }
+                  jQuery(".mainheader_message_fail").show();
+                  jQuery(".mainheader_message_inner_fail").css("display", "inline");
+                  jQuery("#ct_sucess_message_fail").text(errMsg);
+                  jQuery(".mainheader_message_fail").fadeOut(8000);
                 }
+              },
+              error: function (xhr) {
+                clicked = false;
+                jQuery(".ct-loading-main-complete_booking").hide();
+                jQuery(".mainheader_message_fail").show();
+                jQuery(".mainheader_message_inner_fail").css("display", "inline");
+                jQuery("#ct_sucess_message_fail").text("Booking request failed (" + (xhr && xhr.status ? xhr.status : "network") + ")");
+                jQuery(".mainheader_message_fail").fadeOut(6000);
               }
-            })
+            });
           }
           payment_process_js(payment_method, thankyou_page_setting_value, dataString, front_url);
         } else {
@@ -1328,9 +1363,9 @@ jQuery(document).on("change", ".existing-user", function () {
     jQuery("#ct-state").val("");
     jQuery("#ct-notes").val("");
     jQuery(".spaical_referral_class").css("display", "none");
-    jQuery(".ct-login-existing").show("blind", { direction: "vertical" }, 700);
-    jQuery(".ct-new-user-details").hide("blind", { direction: "vertical" }, 300);
-    jQuery(".ct-peronal-details").hide("blind", { direction: "vertical" }, 300);
+    jQuery(".ct-login-existing").show();
+    jQuery(".ct-new-user-details").hide();
+    jQuery(".ct-peronal-details").hide();
     guest_user_status = "off";
   }
 });
@@ -1352,11 +1387,11 @@ jQuery(document).on("change", ".new-user", function () {
     jQuery("#ct-state").val("");
     jQuery("#ct-notes").val("");
     jQuery(".spaical_referral_class").css("display", "block");
-    jQuery(".ct-new-user-details").show("blind", { direction: "vertical" }, 700);
-    jQuery(".ct-login-existing").hide("blind", { direction: "vertical" }, 300);
-    jQuery(".ct-peronal-details").show("blind", { direction: "vertical" }, 300);
-    jQuery(".remove_preferred_password_and_preferred_email").show("blind", { direction: "vertical" }, 300);
-    jQuery(".remove_guest_user_preferred_email").hide("blind", { direction: "vertical" }, 300);
+    jQuery(".ct-new-user-details").show();
+    jQuery(".ct-login-existing").hide();
+    jQuery(".ct-peronal-details").show();
+    jQuery(".remove_preferred_password_and_preferred_email").show();
+    jQuery(".remove_guest_user_preferred_email").hide();
     if (jQuery(".remove_zip_code_class").hasClass("ct-md-6")) {
       jQuery(".remove_zip_code_class").removeClass("ct-md-6");
       jQuery(".remove_zip_code_class").addClass("ct-md-4");
@@ -1389,11 +1424,11 @@ jQuery(document).on("change", ".guest-user", function () {
     jQuery("#ct-city").val("");
     jQuery("#ct-state").val("");
     jQuery("#ct-notes").val("");
-    jQuery(".ct-new-user-details").show("blind", { direction: "vertical" }, 700);
-    jQuery(".ct-login-existing").hide("blind", { direction: "vertical" }, 300);
-    jQuery(".ct-peronal-details").show("blind", { direction: "vertical" }, 300);
-    jQuery(".remove_preferred_password_and_preferred_email").hide("blind", { direction: "vertical" }, 300);
-    jQuery(".remove_guest_user_preferred_email").show("blind", { direction: "vertical" }, 300);
+    jQuery(".ct-new-user-details").show();
+    jQuery(".ct-login-existing").hide();
+    jQuery(".ct-peronal-details").show();
+    jQuery(".remove_preferred_password_and_preferred_email").hide();
+    jQuery(".remove_guest_user_preferred_email").show();
     if (jQuery(".remove_zip_code_class").hasClass("ct-md-4")) {
       jQuery(".remove_zip_code_class").removeClass("ct-md-4");
       jQuery(".remove_zip_code_class").addClass("ct-md-6");
@@ -1579,6 +1614,8 @@ jQuery(document).on('click', '.ser_details', function (e) {
         jQuery('.show_single_service_method').html(methods_data.m_html);
         jQuery('.s_m_units_design').trigger('click');
         jQuery('#method_not_selected_error').hide();
+        /* Cup24: doctor is assigned at checkout — skip staff list AJAX */
+        if (!jQuery("#ksc-service-cards").length) {
         var ct_postal_input = jQuery(".ct-postal-input").val();
         // alert(ct_postal_input);
         jQuery.ajax({
@@ -1624,10 +1661,12 @@ jQuery(document).on('click', '.ser_details', function (e) {
             }
           }
         });
+        }
 
       } else {
         jQuery('.show_single_service_method').html(methods_data.m_html);
         $('.ct_method_tab-slider-tabs li:first').trigger('click');
+        if (!jQuery("#ksc-service-cards").length) {
         var ct_postal_input = jQuery(".ct-postal-input").val();
         // alert(ct_postal_input);
         jQuery.ajax({
@@ -1675,9 +1714,13 @@ jQuery(document).on('click', '.ser_details', function (e) {
 
           }
         });
+        }
       }
     }
   });
+  /* Cup24 service cards already have a calendar on the page; skip the
+     full calendar reload + addons fetch to avoid a burst of AJAX. */
+  if (!jQuery("#ksc-service-cards").length) {
   jQuery.ajax({
     type: "POST",
     url: ajax_url + "calendar_ajax.php",
@@ -1731,16 +1774,10 @@ jQuery(document).on('click', '.ser_details', function (e) {
         jQuery('.hide_allsss_addons').show();
         jQuery('.add_on_lists').html(res);
         jQuery('.add_minus_button').hide();
-        /* jQuery('.add_addon_in_cart_for_multipleqty').each(function(){
-            var multiqty_addon_id = jQuery(this).data('id');
-            var value = jQuery(this).prop('checked');
-            if(value == true){
-                jQuery('#ct-addon-'+multiqty_addon_id).attr('checked', false);
-            }
-        }); */
       }
     }
   });
+  }
   e.stopImmediatePropagation();
   return false;
 });
@@ -2162,18 +2199,18 @@ jQuery(document).on("click", ".addons_servicess", function () {
 /* ct_user_radio_group */
 jQuery(document).on("change", ".existing-user", function () {
   if (jQuery(".existing-user").is(":checked")) {
-    jQuery(".ct-login-existing").show("blind", { direction: "vertical" }, 700);
-    jQuery(".ct-new-user-details").hide("blind", { direction: "vertical" }, 300);
-    jQuery(".ct-peronal-details").hide("blind", { direction: "vertical" }, 300);
+    jQuery(".ct-login-existing").show();
+    jQuery(".ct-new-user-details").hide();
+    jQuery(".ct-peronal-details").hide();
   }
   jQuery(".fancy_input").each(function () { jQuery(this).trigger("keyup"); });
   jQuery(".fancy_input").each(function () { jQuery(this).trigger("keyup"); });
 });
 jQuery(document).on("change", ".new-user", function () {
   if (jQuery(".new-user").is(":checked")) {
-    jQuery(".ct-new-user-details").show("blind", { direction: "vertical" }, 700);
-    jQuery(".ct-login-existing").hide("blind", { direction: "vertical" }, 300);
-    jQuery(".ct-peronal-details").show("blind", { direction: "vertical" }, 300);
+    jQuery(".ct-new-user-details").show();
+    jQuery(".ct-login-existing").hide();
+    jQuery(".ct-peronal-details").show();
   }
   jQuery(".fancy_input").each(function () { jQuery(this).trigger("keyup"); });
 });

@@ -362,14 +362,10 @@ if (isset($_POST['u_member_email'])) {
 		$objadmin->external_employee_id = ($currMapRow && !empty($currMapRow['external_employee_id'])) ? (int)$currMapRow['external_employee_id'] : null;
 	}
 
-	if ($_POST['ct_service_staff'] != '') {
-		$new_service = implode(",", $_POST['ct_service_staff']);
-	} else {
-		$new_service = $_POST['ct_service_staff'];
-	}
-
-
-	$objadmin->ct_service_staff = $new_service;
+	/* service_ids assignment removed — keep existing DB value (availability via API) */
+	$keepSvcQ = mysqli_query($conn, "SELECT `service_ids` FROM `ct_admin_info` WHERE `id` = " . (int)$objadmin->id . " LIMIT 1");
+	$keepSvcRow = $keepSvcQ ? mysqli_fetch_assoc($keepSvcQ) : null;
+	$objadmin->ct_service_staff = ($keepSvcRow && isset($keepSvcRow['service_ids'])) ? $keepSvcRow['service_ids'] : '';
 	$objadmin->update_staff_details();
 
 	/*if($_POST['staff_schedule'] != $_POST['old_schedule']){
@@ -388,9 +384,10 @@ if (isset($_POST['u_member_email'])) {
 	$objadmin->zip = $_POST['zip'];
 	$objadmin->country = $_POST['country'];
 	$objadmin->image = $_POST['staff_image'];
-	$new_service = implode(",", $_POST['ct_service_staff']);
-
-	$objadmin->ct_service_staff = $new_service;
+	/* service_ids assignment removed — keep existing DB value */
+	$keepSvcQ = mysqli_query($conn, "SELECT `service_ids` FROM `ct_admin_info` WHERE `id` = " . (int)$objadmin->id . " LIMIT 1");
+	$keepSvcRow = $keepSvcQ ? mysqli_fetch_assoc($keepSvcQ) : null;
+	$objadmin->ct_service_staff = ($keepSvcRow && isset($keepSvcRow['service_ids'])) ? $keepSvcRow['service_ids'] : '';
 	$objadmin->update_staff_details_staffsection();
 
 	if ($_POST['staff_schedule'] != $_POST['old_schedule']) {
@@ -768,39 +765,7 @@ if (isset($_POST['u_member_email'])) {
 									</label>
 								</div>
 							</div>
-							<?php
-							if ($settings->get_option('ct_staff_zipcode') == 'Y') {
-								echo "";
-							} else {
-								?>
-								<div class="col-xs-12 col-md-6 pt-10 ct-staff-common-table1">
-									<div class="col-xs-4"><label
-											for="service"><?php echo $label_language_values['service']; ?></label></div>
-									<div class="col-xs-8">
-										<select class="selectpicker mb-10" id="ct_service_staff" multiple data-size="10"
-											style="display: none;">
-											<option value="" disabled>
-												<?php echo $label_language_values['choose_your_service']; ?></option>
-											<?php
-											$getservice = $objservices->getalldata();
-											if ($getservice->num_rows > 0) {
-												$assigned_services = isset($staff_read['service_ids']) ? $staff_read['service_ids'] : (isset($staff_read[17]) ? $staff_read[17] : '');
-												while ($arr = @mysqli_fetch_array($getservice)) {
-													$get_service_assignid = explode(",", $assigned_services);
-													$svc_id = isset($arr['id']) ? $arr['id'] : $arr[0];
-													$svc_title = isset($arr['title']) ? $arr['title'] : $arr[1];
-													if (in_array($svc_id, $get_service_assignid)) {
-														echo "<option selected='selected' value='" . $svc_id . "'>" . htmlspecialchars($svc_title) . "</option>";
-													} else {
-														echo "<option value='" . $svc_id . "'>" . htmlspecialchars($svc_title) . "</option>";
-													}
-												}
-											}
-											?>
-										</select>
-									</div>
-								</div>
-							<?php } ?>
+							<?php /* Doctor↔service assignment removed — slots/assign use Kinesis API */ ?>
 							<div class="col-xs-12 mt-5">
 								<div class="col-xs-4 col-md-2"></div>
 								<div class="col-xs-8 col-md-10">

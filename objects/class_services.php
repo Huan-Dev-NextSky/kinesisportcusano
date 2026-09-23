@@ -108,6 +108,8 @@ class cleanto_services{
 		}
 		$unit_title = mysqli_real_escape_string($this->conn, 'Session');
 		mysqli_query($this->conn, "INSERT INTO `".$this->table_name_smu."` (`id`,`services_id`,`methods_id`,`units_title`,`base_price`,`minlimit`,`maxlimit`,`status`,`position`,`limit_title`,`unit_symbol`,`half_section`,`uduration`) VALUES (NULL,'".$service_id."','".$method_id."','".$unit_title."','".$price."','1','1','E','0','','','D','".$duration."')");
+		/* Design 3 = unit buttons (same as working Linfotecar). Without this row, front_ajax never loads add_item_in_cart. */
+		@mysqli_query($this->conn, "INSERT INTO `".$this->table_name_smd."` (`id`,`service_methods_id`,`design`) VALUES (NULL,'".$method_id."','3')");
 		return true;
 	}
 	

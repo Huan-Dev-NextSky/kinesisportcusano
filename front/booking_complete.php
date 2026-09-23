@@ -196,6 +196,12 @@ if (isset($_SESSION["ct_details"]) && $_SESSION["ct_details"] != "") {
     $booking_status = "A";
   }
 
+  $pm_for_ok = isset($_SESSION["ct_details"]["payment_method"]) ? $_SESSION["ct_details"]["payment_method"] : "";
+  $ksc_flush_ok_early = in_array($pm_for_ok, array("pay at venue", "bank transfer", ""), true);
+  if ($ksc_flush_ok_early) {
+    @ini_set("display_errors", "0");
+  }
+
   $coupon->coupon_code = $_SESSION["ct_details"]["coupon_code"];
   $result = $coupon->checkcode();
   if ($result) {
@@ -310,30 +316,58 @@ if (isset($_SESSION["ct_details"]) && $_SESSION["ct_details"] != "") {
   }
   $booking_date_time = date("Y-m-d H:i:s", strtotime($_SESSION["ct_details"]["booking_date_time"]));
 
-  if ($staff_id == "" && $_SESSION["staff_id_cal"] != "") {
-    $provider_sec = $_SESSION["provider_sec"];
-    $staff_idss = explode(",", $provider_sec);
-
-
-    foreach ($staff_idss as $staff_key => $staff_value) {
-      if ($staff_value !== "") {
-        /* $service_provider = $_SESSION["ct_cart"]["method"][0]["service_id"]; */
-        $objadminprofile->staff_value = $staff_value;
-        $objadminprofile->booking_date_time = $booking_date_time;
-        $service_provider_list = $objadminprofile->get_staff_id_acc_datetime();
-        if ($service_provider_list == 0) {
-
-          $check_staff_id = $staff_value;
-          break;
-
-        }
-      } else {
-        $check_staff_id = "";
-      }
-    }
-  } else {
-    $check_staff_id = $staff_id;
+  /* Assign Doctor only if Kinesis API still has this service slot for them */
+  $check_staff_id = "";
+  $service_id_for_assign = 0;
+  if (!empty($_SESSION["ct_cart"]["method"][0]["service_id"])) {
+    $service_id_for_assign = (int)$_SESSION["ct_cart"]["method"][0]["service_id"];
   }
+  $preferred_staff = 0;
+  if ($staff_id !== "" && (int)$staff_id > 0) {
+    $preferred_staff = (int)$staff_id;
+  }
+  if ($preferred_staff <= 0 && !empty($_SESSION["staff_id_cal"]) && $_SESSION["staff_id_cal"] !== "random" && (int)$_SESSION["staff_id_cal"] > 0) {
+    $preferred_staff = (int)$_SESSION["staff_id_cal"];
+  }
+  if ($preferred_staff <= 0 && !empty($_SESSION["ksc_checkout"]["staff_id"]) && (int)$_SESSION["ksc_checkout"]["staff_id"] > 0) {
+    $preferred_staff = (int)$_SESSION["ksc_checkout"]["staff_id"];
+  }
+
+  $assign_error = "";
+  if ($service_id_for_assign <= 0 || !$booking_date_time) {
+    $assign_error = "Servizio o data/ora non validi.";
+  } elseif ($settings->get_option("kinesis_api_status") !== "Y") {
+    $assign_error = "Disponibilità professionisti non disponibile. Riprova più tardi.";
+  } else {
+    try {
+      include_once dirname(dirname(__FILE__)) . "/assets/lib/ksc_dates_with_slots.php";
+      $assigned_staff = ksc_assign_doctor_for_datetime(
+        $conn,
+        $settings,
+        $first_step,
+        $service_id_for_assign,
+        $booking_date_time,
+        $preferred_staff > 0 ? $preferred_staff : null,
+        false
+      );
+      if ($assigned_staff) {
+        $check_staff_id = (string)(int)$assigned_staff;
+      } else {
+        $assign_error = "Nessun professionista disponibile per questo orario. Seleziona un altro slot.";
+      }
+    } catch (Throwable $e) {
+      $assign_error = "Impossibile verificare la disponibilità. Riprova.";
+    }
+  }
+
+  if ($assign_error !== "" || $check_staff_id === "" || (int)$check_staff_id <= 0) {
+    header("Content-Type: text/plain; charset=utf-8");
+    echo $assign_error !== "" ? $assign_error : "Nessun professionista disponibile per questo orario. Seleziona un altro slot.";
+    exit;
+  }
+
+  $_SESSION["staff_id_cal"] = $check_staff_id;
+  $_SESSION["ct_details"]["staff_id"] = $check_staff_id;
 
   $client_id = 0;
   $stripe_cus_id = "";
@@ -573,8 +607,13 @@ if (isset($_SESSION["ct_details"]) && $_SESSION["ct_details"] != "") {
           }
         }
         if ($gc_hook->gc_purchase_status() == "exist") {
-          echo $gc_hook->gc_add_booking_ajax_hook();
-          echo $gc_hook->gc_add_staff_booking_ajax_hook();
+          if (!empty($ksc_flush_ok_early)) {
+            @$gc_hook->gc_add_booking_ajax_hook();
+            @$gc_hook->gc_add_staff_booking_ajax_hook();
+          } else {
+            echo $gc_hook->gc_add_booking_ajax_hook();
+            echo $gc_hook->gc_add_staff_booking_ajax_hook();
+          }
         }
         $orderid++;
       }
@@ -628,17 +667,61 @@ if (isset($_SESSION["ct_details"]) && $_SESSION["ct_details"] != "") {
       $order_client_info->recurring_id = $rec_id;
       $add_guest_user = $order_client_info->add_order_client();
       if ($gc_hook->gc_purchase_status() == "exist") {
-        echo $gc_hook->gc_add_booking_ajax_hook();
-        echo $gc_hook->gc_add_staff_booking_ajax_hook();
+        if (!empty($ksc_flush_ok_early)) {
+          @$gc_hook->gc_add_booking_ajax_hook();
+          @$gc_hook->gc_add_staff_booking_ajax_hook();
+        } else {
+          echo $gc_hook->gc_add_booking_ajax_hook();
+          echo $gc_hook->gc_add_staff_booking_ajax_hook();
+        }
       }
     }
   }
-  if ($staff_id) {
+  /* Always persist Doctor on the booking + staff_status (Cup24 POST staff_id is often empty) */
+  if ((int)$check_staff_id > 0 && !empty($email_order_id)) {
+    $booking->order_id = $email_order_id;
     $booking->staff_id = $check_staff_id;
-    $booking->order_id = $orderid;
-    $status_insert_id = $booking->staff_status_insert();
+    $booking->save_staff_to_booking($check_staff_id);
+    $ss_q = @mysqli_query($conn, "SELECT `id` FROM `ct_staff_status` WHERE `order_id`='" . (int)$email_order_id . "' AND `staff_id`='" . (int)$check_staff_id . "' LIMIT 1");
+    if (!$ss_q || mysqli_num_rows($ss_q) === 0) {
+      $booking->order_id = $email_order_id;
+      $booking->staff_id = $check_staff_id;
+      $booking->staff_status_insert();
+    }
   }
   $orderid = $email_order_id;
+
+  /* Push to Kinesis BEFORE thank-you "ok" so appointment ids exist for later admin cancel/delete.
+     Doctor assign above is local-only (fast); this sync is usually a few seconds. */
+  if ($settings->get_option("kinesis_api_status") === "Y" && !empty($email_order_id)) {
+    $oidSync = (int)$email_order_id;
+    @mysqli_query($conn, "UPDATE `ct_bookings` SET `kinesis_sync_status` = IFNULL(NULLIF(`kinesis_sync_status`, ''), 'PENDING') WHERE `order_id` = {$oidSync} AND (`kinesis_appointment_id` IS NULL OR `kinesis_appointment_id` = 0)");
+    try {
+      require_once dirname(dirname(__FILE__)) . "/integrations/awwapi/AwwAppointmentSync.php";
+      $apptSync = new AwwAppointmentSync($conn);
+      $apptSync->syncSingleBooking($oidSync);
+    } catch (Throwable $e) {
+      /* Keep PENDING for cron/admin sync retry */
+    }
+  }
+
+  /* Respond to checkout AJAX ASAP after booking (+ best-effort Kinesis create) is done. */
+  if (!empty($ksc_flush_ok_early)) {
+    while (ob_get_level() > 0) {
+      @ob_end_clean();
+    }
+    if (!headers_sent()) {
+      header("Content-Type: text/plain; charset=utf-8");
+    }
+    echo "ok";
+    if (function_exists("fastcgi_finish_request")) {
+      @fastcgi_finish_request();
+    } else {
+      @ignore_user_abort(true);
+      @flush();
+    }
+  }
+
   /*** Email Code Start ***/
   $order_client_info->order_id = $orderid;
   $admin_infoo = $order_client_info->readone_for_email();
@@ -1593,7 +1676,9 @@ if (isset($_SESSION["ct_details"]) && $_SESSION["ct_details"] != "") {
     if ($_SESSION['ct_details']['payment_method'] == "paytm") {
       header('location:' . SITE_URL . 'extension/paytm/paytm_payment_process.php');
     } else {
-      echo "ok";
+      if (empty($ksc_flush_ok_early)) {
+        echo "ok";
+      }
       unset($_SESSION["referral_detail"]["user_referral_code"]);
     }
   }

@@ -3923,11 +3923,26 @@ jQuery(document).off("click.ctRejectBookings", ".reject_bookings").on("click.ctR
     type: "POST",
     url: ajax_url + "my_appoint_ajax.php",
     data: dataString,
+    dataType: "text",
     success: function (response) {
-      jQuery(".mainheader_message").show();
-      jQuery(".mainheader_message_inner").css("display", "inline");
-      jQuery("#ct_sucess_message").text(errorobj_appointment_booking_rejected);
-      jQuery(".mainheader_message").fadeOut(3000);
+      var warning = null;
+      try {
+        var parsed = typeof response === "string" ? JSON.parse(response) : response;
+        if (parsed && parsed.warning) {
+          warning = parsed.warning;
+        }
+      } catch (ignore) { }
+      if (warning) {
+        jQuery(".mainheader_message_fail").show();
+        jQuery(".mainheader_message_inner_fail").css("display", "inline");
+        jQuery("#ct_sucess_message_fail").text("Rejected locally, but Kinesis API did not remove it: " + warning);
+        jQuery(".mainheader_message_fail").fadeOut(8000);
+      } else {
+        jQuery(".mainheader_message").show();
+        jQuery(".mainheader_message_inner").css("display", "inline");
+        jQuery("#ct_sucess_message").text(errorobj_appointment_booking_rejected);
+        jQuery(".mainheader_message").fadeOut(3000);
+      }
       jQuery("#booking-details-calendar").modal("hide");
       location.reload();
     },
@@ -4036,10 +4051,17 @@ jQuery(document).off("click.ctDeleteBookings", ".delete_bookings").on("click.ctD
         return;
       }
       jQuery("#ct-admin-delete-panel").hide();
-      jQuery(".mainheader_message").show();
-      jQuery(".mainheader_message_inner").css("display", "inline");
-      jQuery("#ct_sucess_message").text(typeof errorobj_booking_deleted !== "undefined" ? errorobj_booking_deleted : "Booking deleted");
-      jQuery(".mainheader_message").fadeOut(3000);
+      if (response && response.warning) {
+        jQuery(".mainheader_message_fail").show();
+        jQuery(".mainheader_message_inner_fail").css("display", "inline");
+        jQuery("#ct_sucess_message_fail").text("Deleted locally, but Kinesis API did not remove it: " + response.warning);
+        jQuery(".mainheader_message_fail").fadeOut(8000);
+      } else {
+        jQuery(".mainheader_message").show();
+        jQuery(".mainheader_message_inner").css("display", "inline");
+        jQuery("#ct_sucess_message").text(typeof errorobj_booking_deleted !== "undefined" ? errorobj_booking_deleted : "Booking deleted");
+        jQuery(".mainheader_message").fadeOut(3000);
+      }
       jQuery("#booking-details-calendar").modal("hide");
       jQuery("#info_modal_close").trigger("click");
       jQuery("#updateinfo_modal_close").trigger("click");

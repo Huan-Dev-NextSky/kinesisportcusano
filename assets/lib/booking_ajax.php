@@ -90,11 +90,22 @@ if (isset($_POST['action']) && $_POST['action'] == 'reject_booking') {
         $currDateTime_withTZ = strtotime("+" . $timediffmis . " minutes", strtotime(date('Y-m-d H:i:s')));
     }
     $current_time = date('Y-m-d H:i:s', $currDateTime_withTZ);
-    $booking->order_id = $_POST['booking_id'];
+    $order_id = (int)$_POST['booking_id'];
+    $booking->order_id = $order_id;
     $booking->reject_reason = $_POST['reject_reason_book'];
     $booking->lastmodify = $current_time;
     $update_status1 = $booking->update_reject_status();
     if ($update_status1) {
+        @mysqli_query($conn, "UPDATE `ct_bookings` SET `kinesis_sync_status` = IF(`kinesis_appointment_id` IS NOT NULL AND `kinesis_appointment_id` > 0, 'CANCEL_PENDING', `kinesis_sync_status`) WHERE `order_id` = {$order_id}");
+        @mysqli_query($conn, "UPDATE `ct_gcal_kinesis_sync` SET `sync_status` = 'CANCEL_PENDING', `sync_action` = 'CANCEL', `last_sync_message` = 'Rejected via booking_ajax', `updated_at` = NOW() WHERE `local_order_id` = {$order_id}");
+        if ($settings->get_option('kinesis_api_status') === 'Y') {
+            try {
+                require_once dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwAppointmentSync.php';
+                $apptSync = new AwwAppointmentSync($conn);
+                $apptSync->syncSingleBooking($order_id);
+            } catch (Exception $e) {
+            }
+        }
         echo 'booking Rejected';
     } else {
         echo "failed";

@@ -275,8 +275,9 @@ if(isset($_POST['action']) && $_POST['action']=='complete_booking'){
   $user_state = addslashes($_POST['user_state']);
   $notes = addslashes($_POST['notes']);
   
-  if($_POST['staff_id'] == ""){
-      $staff_id = 1; 
+  /* Leave empty so booking_complete can auto-assign a Doctor who still has the slot */
+  if($_POST['staff_id'] == "" || $_POST['staff_id'] == "0" || $_POST['staff_id'] == "auto"){
+      $staff_id = "";
   }else{
       $staff_id = addslashes($_POST['staff_id']);
   }

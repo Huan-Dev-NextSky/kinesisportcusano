@@ -228,6 +228,244 @@ class AwwAppointmentSync {
     }
 
     /**
+     * Extract appointment + customer ids from Kinesis create/get response payloads.
+     */
+    private function extractIdsFromApiData($data) {
+        $apptId = 0;
+        $custId = 0;
+        if (!is_array($data)) {
+            return array($apptId, $custId);
+        }
+        if (!empty($data['id'])) {
+            $apptId = (int)$data['id'];
+        } elseif (!empty($data['appointmentId'])) {
+            $apptId = (int)$data['appointmentId'];
+        }
+        if (!empty($data['customerId'])) {
+            $custId = (int)$data['customerId'];
+        } elseif (!empty($data['customer']['id'])) {
+            $custId = (int)$data['customer']['id'];
+        }
+        return array($apptId, $custId);
+    }
+
+    /**
+     * Ensure we have both Kinesis appointment + customer ids before calling cancel.
+     * Recovers from sync table / email lookup when create previously saved incomplete ids.
+     */
+    private function resolveKinesisIdsForCancel($row) {
+        $orderId = (int)$row['order_id'];
+        $apptId = !empty($row['kinesis_appointment_id']) ? (int)$row['kinesis_appointment_id'] : 0;
+        $custId = !empty($row['kinesis_customer_id']) ? (int)$row['kinesis_customer_id'] : 0;
+
+        if ($apptId > 0 && $custId > 0) {
+            return array($apptId, $custId);
+        }
+
+        $syncRes = mysqli_query($this->conn, "SELECT `kinesis_appointment_id`, `kinesis_customer_id`, `customer_email`, `event_start`
+            FROM `ct_gcal_kinesis_sync` WHERE `local_order_id` = {$orderId} ORDER BY `id` DESC LIMIT 1");
+        $syncRow = ($syncRes && mysqli_num_rows($syncRes) > 0) ? mysqli_fetch_assoc($syncRes) : null;
+        if ($syncRow) {
+            if ($apptId <= 0 && !empty($syncRow['kinesis_appointment_id'])) {
+                $apptId = (int)$syncRow['kinesis_appointment_id'];
+            }
+            if ($custId <= 0 && !empty($syncRow['kinesis_customer_id'])) {
+                $custId = (int)$syncRow['kinesis_customer_id'];
+            }
+        }
+
+        $email = '';
+        if (!empty($row['client_email'])) {
+            $email = trim($row['client_email']);
+        } elseif (!empty($row['user_email'])) {
+            $email = trim($row['user_email']);
+        } elseif ($syncRow && !empty($syncRow['customer_email'])) {
+            $email = trim($syncRow['customer_email']);
+        }
+
+        if ($custId <= 0 && $email !== '') {
+            $searchRes = $this->apiClient->searchCustomerByEmail($email);
+            if (!empty($searchRes['success']) && !empty($searchRes['data'])) {
+                $custData = is_array($searchRes['data']) && isset($searchRes['data'][0]) ? $searchRes['data'][0] : $searchRes['data'];
+                $custId = isset($custData['id']) ? (int)$custData['id'] : (isset($custData['Id']) ? (int)$custData['Id'] : 0);
+            }
+        }
+
+        if ($custId > 0 && $apptId <= 0 && !empty($row['booking_date_time'])) {
+            try {
+                $dt = new DateTime($row['booking_date_time'], new DateTimeZone('Europe/Rome'));
+            } catch (Exception $e) {
+                $dt = new DateTime($row['booking_date_time']);
+            }
+            $start = $dt->format('Y-m-d');
+            $end = $dt->format('Y-m-d');
+            $list = $this->apiClient->getCustomerAppointments($custId, $start, $end);
+            if (!empty($list['success']) && is_array($list['data'])) {
+                $wanted = $dt->format('Y-m-d\TH:i');
+                foreach ($list['data'] as $appt) {
+                    if (empty($appt['dateTime']) || empty($appt['id'])) {
+                        continue;
+                    }
+                    try {
+                        $slot = (new DateTime($appt['dateTime']))->format('Y-m-d\TH:i');
+                    } catch (Exception $e) {
+                        continue;
+                    }
+                    if ($slot === $wanted) {
+                        $apptId = (int)$appt['id'];
+                        break;
+                    }
+                }
+            }
+        }
+
+        if ($apptId > 0 || $custId > 0) {
+            $apptSql = $apptId > 0 ? (string)$apptId : 'NULL';
+            $custSql = $custId > 0 ? (string)$custId : 'NULL';
+            mysqli_query($this->conn, "UPDATE `ct_bookings` SET `kinesis_appointment_id` = {$apptSql}, `kinesis_customer_id` = {$custSql} WHERE `order_id` = {$orderId}");
+            /* Do not UPDATE historical sync log rows — append-only audit trail */
+        }
+
+        return array($apptId, $custId);
+    }
+
+    private function markCancelFailure($orderId, $errMsg) {
+        $currentTime = date('Y-m-d H:i:s');
+        mysqli_query($this->conn, "UPDATE `ct_bookings` SET `kinesis_sync_status` = 'CANCEL_PENDING', `kinesis_sync_time` = '{$currentTime}' WHERE `order_id` = '{$orderId}'");
+        $this->writeSyncLog((int)$orderId, 'CANCEL_PENDING', 'CANCEL', $errMsg, array());
+    }
+
+    /**
+     * Sync log policy (1 row per booking lifecycle):
+     * - CREATE  → always INSERT a new row
+     * - UPDATE / CANCEL → UPDATE the latest active row for that order (do not insert duplicates)
+     */
+    public function writeSyncLog($orderId, $syncStatus, $syncAction, $message, $extra = array()) {
+        $orderId = (int)$orderId;
+        if ($orderId <= 0) {
+            return false;
+        }
+        $now = date('Y-m-d H:i:s');
+        $statusEsc = mysqli_real_escape_string($this->conn, (string)$syncStatus);
+        $actionEsc = mysqli_real_escape_string($this->conn, (string)$syncAction);
+        $msgEsc = mysqli_real_escape_string($this->conn, (string)$message);
+        $apptId = isset($extra['appointment_id']) ? (int)$extra['appointment_id'] : 0;
+        $custId = isset($extra['customer_id']) ? (int)$extra['customer_id'] : 0;
+        $eventStart = isset($extra['event_start']) ? mysqli_real_escape_string($this->conn, (string)$extra['event_start']) : '';
+        $email = isset($extra['customer_email']) ? mysqli_real_escape_string($this->conn, (string)$extra['customer_email']) : '';
+        $phone = isset($extra['customer_phone']) ? mysqli_real_escape_string($this->conn, (string)$extra['customer_phone']) : '';
+        $name = isset($extra['customer_name']) ? mysqli_real_escape_string($this->conn, (string)$extra['customer_name']) : '';
+        $summary = isset($extra['event_summary']) ? mysqli_real_escape_string($this->conn, (string)$extra['event_summary']) : '';
+        $bookingId = isset($extra['booking_id']) ? (int)$extra['booking_id'] : 0;
+        $serviceId = isset($extra['service_id']) ? (int)$extra['service_id'] : 0;
+        $employeeId = isset($extra['employee_id']) ? (int)$extra['employee_id'] : 0;
+        $gEventId = isset($extra['google_event_id']) ? mysqli_real_escape_string($this->conn, (string)$extra['google_event_id']) : '';
+
+        $actionUpper = strtoupper((string)$syncAction);
+        $isCreate = ($actionUpper === 'CREATE');
+
+        /* CANCEL / UPDATE: mutate the latest active row for this order (1 row per booking) */
+        if (!$isCreate) {
+            $activeId = 0;
+            if ($apptId > 0) {
+                $q = mysqli_query($this->conn, "SELECT `id` FROM `ct_gcal_kinesis_sync`
+                    WHERE `local_order_id` = {$orderId} AND `kinesis_appointment_id` = {$apptId}
+                    ORDER BY `id` DESC LIMIT 1");
+                if ($q && ($r = mysqli_fetch_assoc($q))) {
+                    $activeId = (int)$r['id'];
+                }
+            }
+            if ($activeId <= 0) {
+                $q = mysqli_query($this->conn, "SELECT `id` FROM `ct_gcal_kinesis_sync`
+                    WHERE `local_order_id` = {$orderId}
+                      AND (`sync_status` IS NULL OR `sync_status` NOT IN ('CANCELLED'))
+                    ORDER BY `id` DESC LIMIT 1");
+                if ($q && ($r = mysqli_fetch_assoc($q))) {
+                    $activeId = (int)$r['id'];
+                }
+            }
+            if ($activeId <= 0) {
+                /* Fallback: latest row for order */
+                $q = mysqli_query($this->conn, "SELECT `id` FROM `ct_gcal_kinesis_sync` WHERE `local_order_id` = {$orderId} ORDER BY `id` DESC LIMIT 1");
+                if ($q && ($r = mysqli_fetch_assoc($q))) {
+                    $activeId = (int)$r['id'];
+                }
+            }
+
+            if ($activeId > 0) {
+                $sets = array(
+                    "`sync_status` = '{$statusEsc}'",
+                    "`sync_action` = '{$actionEsc}'",
+                    "`last_sync_message` = '{$msgEsc}'",
+                    "`updated_at` = '{$now}'"
+                );
+                if ($apptId > 0) {
+                    $sets[] = "`kinesis_appointment_id` = {$apptId}";
+                }
+                if ($custId > 0) {
+                    $sets[] = "`kinesis_customer_id` = {$custId}";
+                }
+                if ($eventStart !== '') {
+                    $sets[] = "`event_start` = '{$eventStart}'";
+                }
+                if ($email !== '') {
+                    $sets[] = "`customer_email` = '{$email}'";
+                }
+                if ($phone !== '') {
+                    $sets[] = "`customer_phone` = '{$phone}'";
+                }
+                if ($name !== '') {
+                    $sets[] = "`customer_name` = '{$name}'";
+                }
+                if ($summary !== '') {
+                    $sets[] = "`event_summary` = '{$summary}'";
+                }
+                if ($bookingId > 0) {
+                    $sets[] = "`local_booking_id` = {$bookingId}";
+                }
+                if ($serviceId > 0) {
+                    $sets[] = "`service_id` = {$serviceId}";
+                }
+                if ($employeeId > 0) {
+                    $sets[] = "`employee_id` = {$employeeId}";
+                }
+                return (bool)mysqli_query($this->conn, "UPDATE `ct_gcal_kinesis_sync` SET " . implode(', ', $sets) . " WHERE `id` = {$activeId}");
+            }
+            /* No existing row — fall through to INSERT once */
+        }
+
+        $apptSql = $apptId > 0 ? (string)$apptId : 'NULL';
+        $custSql = $custId > 0 ? (string)$custId : 'NULL';
+        $bookingSql = $bookingId > 0 ? (string)$bookingId : 'NULL';
+        $serviceSql = $serviceId > 0 ? (string)$serviceId : 'NULL';
+        $employeeSql = $employeeId > 0 ? (string)$employeeId : 'NULL';
+        $startSql = $eventStart !== '' ? "'{$eventStart}'" : 'NULL';
+        if ($summary === '') {
+            $summary = $actionEsc . ' sync';
+        }
+
+        return (bool)mysqli_query($this->conn, "INSERT INTO `ct_gcal_kinesis_sync` (
+            `google_event_id`, `local_order_id`, `local_booking_id`, `kinesis_customer_id`, `kinesis_appointment_id`,
+            `event_summary`, `event_start`, `customer_email`, `customer_phone`, `customer_name`, `customer_dob`,
+            `service_id`, `employee_id`, `sync_status`, `sync_action`, `last_sync_message`, `created_at`, `updated_at`
+        ) VALUES (
+            '{$gEventId}', {$orderId}, {$bookingSql}, {$custSql}, {$apptSql},
+            '{$summary}', {$startSql}, '{$email}', '{$phone}', '{$name}', '1990-01-01',
+            {$serviceSql}, {$employeeSql}, '{$statusEsc}', '{$actionEsc}', '{$msgEsc}', '{$now}', '{$now}'
+        )");
+    }
+
+    /** @deprecated */
+    public function appendSyncLog($orderId, $syncStatus, $syncAction, $message, $extra = array()) {
+        return $this->writeSyncLog($orderId, $syncStatus, $syncAction, $message, $extra);
+    }
+
+    /** @deprecated */
+    public function upsertSyncLog($orderId, $syncStatus, $syncAction, $message, $extra = array()) {
+        return $this->writeSyncLog($orderId, $syncStatus, $syncAction, $message, $extra);
+    }
+
+    /**
      * Process an individual booking record to Kinesis API
      */
     private function processLocalBooking($row) {
@@ -238,25 +476,49 @@ class AwwAppointmentSync {
         // Check if this is a cancellation
         $isCancelled = in_array($row['booking_status'], array('CC', 'CS', 'R')) || $row['kinesis_sync_status'] === 'CANCEL_PENDING';
         if ($isCancelled) {
-            if (!empty($row['kinesis_appointment_id'])) {
-                if (empty($row['kinesis_customer_id'])) {
-                    mysqli_query($this->conn, "UPDATE `ct_bookings` SET `kinesis_sync_status` = 'CANCEL_PENDING', `kinesis_sync_time` = '{$currentTime}' WHERE `order_id` = '{$orderId}'");
-                    return array('success' => false, 'action' => 'CANCEL', 'error' => 'Missing kinesis_customer_id; cannot cancel remote appointment.');
+            list($apptId, $custId) = $this->resolveKinesisIdsForCancel($row);
+
+            if ($apptId > 0) {
+                if ($custId <= 0) {
+                    $err = 'Missing kinesis_customer_id; cannot cancel remote appointment #' . $apptId;
+                    $this->markCancelFailure($orderId, $err);
+                    return array('success' => false, 'action' => 'CANCEL', 'error' => $err, 'appointmentId' => $apptId);
                 }
 
-                $cancelRes = $this->apiClient->cancelAppointment((int)$row['kinesis_customer_id'], (int)$row['kinesis_appointment_id']);
+                $cancelRes = $this->apiClient->cancelAppointment($custId, $apptId);
 
                 if (!empty($cancelRes['success'])) {
                     mysqli_query($this->conn, "UPDATE `ct_bookings` SET `kinesis_sync_status` = 'CANCELLED', `kinesis_sync_time` = '{$currentTime}' WHERE `order_id` = '{$orderId}'");
-                    mysqli_query($this->conn, "UPDATE `ct_gcal_kinesis_sync` SET `sync_status` = 'CANCELLED', `sync_action` = 'CANCEL', `last_sync_message` = 'Cancelled on Kinesis API', `updated_at` = '{$currentTime}' WHERE `local_order_id` = '{$orderId}'");
-                    return array('success' => true, 'action' => 'CANCEL', 'appointmentId' => $row['kinesis_appointment_id']);
+                    $this->writeSyncLog($orderId, 'CANCELLED', 'CANCEL', 'Cancelled on Kinesis API', array(
+                        'appointment_id' => $apptId,
+                        'customer_id' => $custId,
+                        'booking_id' => $bookingId,
+                        'event_start' => isset($row['booking_date_time']) ? $row['booking_date_time'] : '',
+                        'customer_email' => !empty($row['client_email']) ? $row['client_email'] : (isset($row['user_email']) ? $row['user_email'] : ''),
+                        'customer_name' => trim((isset($row['first_name']) ? $row['first_name'] : '') . ' ' . (isset($row['last_name']) ? $row['last_name'] : '')),
+                        'event_summary' => trim((isset($row['client_name']) ? $row['client_name'] : '') . ' - ' . (isset($row['service_title']) ? $row['service_title'] : '')),
+                        'service_id' => !empty($row['external_service_id']) ? (int)$row['external_service_id'] : 0
+                    ));
+                    return array('success' => true, 'action' => 'CANCEL', 'appointmentId' => $apptId, 'customerId' => $custId);
                 }
 
                 $errMsg = isset($cancelRes['error']) ? $cancelRes['error'] : 'Failed to cancel appointment on Kinesis API';
-                mysqli_query($this->conn, "UPDATE `ct_bookings` SET `kinesis_sync_status` = 'CANCEL_PENDING', `kinesis_sync_time` = '{$currentTime}' WHERE `order_id` = '{$orderId}'");
-                return array('success' => false, 'action' => 'CANCEL', 'error' => $errMsg);
+                $this->markCancelFailure($orderId, $errMsg);
+                return array(
+                    'success' => false,
+                    'action' => 'CANCEL',
+                    'error' => $errMsg,
+                    'status' => isset($cancelRes['status']) ? $cancelRes['status'] : null,
+                    'appointmentId' => $apptId,
+                    'customerId' => $custId
+                );
             }
             mysqli_query($this->conn, "UPDATE `ct_bookings` SET `kinesis_sync_status` = 'CANCELLED', `kinesis_sync_time` = '{$currentTime}' WHERE `order_id` = '{$orderId}'");
+            $this->writeSyncLog($orderId, 'CANCELLED', 'CANCEL', 'No active Kinesis appointment id on local booking; remote cancel skipped', array(
+                'booking_id' => $bookingId,
+                'event_start' => isset($row['booking_date_time']) ? $row['booking_date_time'] : '',
+                'customer_email' => !empty($row['client_email']) ? $row['client_email'] : (isset($row['user_email']) ? $row['user_email'] : '')
+            ));
             return array('success' => true, 'action' => 'CANCEL', 'note' => 'No active Kinesis appointment to cancel.');
         }
 
@@ -281,7 +543,16 @@ class AwwAppointmentSync {
 
             if ($patchRes['success']) {
                 mysqli_query($this->conn, "UPDATE `ct_bookings` SET `kinesis_sync_status` = 'SYNCED', `kinesis_sync_time` = '{$currentTime}' WHERE `order_id` = '{$orderId}'");
-                mysqli_query($this->conn, "UPDATE `ct_gcal_kinesis_sync` SET `sync_status` = 'SYNCED', `sync_action` = 'UPDATE', `last_sync_message` = 'Updated on Kinesis API', `updated_at` = '{$currentTime}' WHERE `local_order_id` = '{$orderId}'");
+                $this->writeSyncLog($orderId, 'SYNCED', 'UPDATE', 'Updated on Kinesis API', array(
+                    'appointment_id' => (int)$row['kinesis_appointment_id'],
+                    'customer_id' => (int)$row['kinesis_customer_id'],
+                    'booking_id' => $bookingId,
+                    'event_start' => $row['booking_date_time'],
+                    'customer_email' => !empty($row['client_email']) ? $row['client_email'] : (isset($row['user_email']) ? $row['user_email'] : ''),
+                    'customer_name' => trim((isset($row['first_name']) ? $row['first_name'] : '') . ' ' . (isset($row['last_name']) ? $row['last_name'] : '')),
+                    'service_id' => !empty($row['external_service_id']) ? (int)$row['external_service_id'] : 0,
+                    'event_summary' => trim((!empty($row['client_name']) ? $row['client_name'] : trim((isset($row['first_name']) ? $row['first_name'] : '') . ' ' . (isset($row['last_name']) ? $row['last_name'] : ''))) . ' - ' . (isset($row['service_title']) ? $row['service_title'] : ''))
+                ));
                 return array('success' => true, 'action' => 'UPDATE', 'appointmentId' => $row['kinesis_appointment_id']);
             }
             $errMsg = isset($patchRes['error']) ? $patchRes['error'] : 'Failed to patch appointment on Kinesis API';
@@ -337,7 +608,11 @@ class AwwAppointmentSync {
             );
 
             if ($createRes['success']) {
-                $kinesisApptId = isset($createRes['data']['id']) ? (int)$createRes['data']['id'] : (isset($createRes['data']['appointmentId']) ? (int)$createRes['data']['appointmentId'] : 0);
+                list($parsedAppt, $parsedCust) = $this->extractIdsFromApiData(isset($createRes['data']) ? $createRes['data'] : null);
+                $kinesisApptId = $parsedAppt;
+                if ($parsedCust > 0) {
+                    $kinesisCustomerId = $parsedCust;
+                }
             } else {
                 return array(
                     'success' => false,
@@ -355,8 +630,9 @@ class AwwAppointmentSync {
             );
 
             if ($createRes['success']) {
-                $kinesisApptId = isset($createRes['data']['id']) ? (int)$createRes['data']['id'] : (isset($createRes['data']['appointmentId']) ? (int)$createRes['data']['appointmentId'] : 0);
-                $kinesisCustomerId = isset($createRes['data']['customerId']) ? (int)$createRes['data']['customerId'] : 0;
+                list($parsedAppt, $parsedCust) = $this->extractIdsFromApiData(isset($createRes['data']) ? $createRes['data'] : null);
+                $kinesisApptId = $parsedAppt;
+                $kinesisCustomerId = $parsedCust;
             } else {
                 return array(
                     'success' => false,
@@ -372,33 +648,24 @@ class AwwAppointmentSync {
 
         mysqli_query($this->conn, "UPDATE `ct_bookings` SET `kinesis_appointment_id` = {$apptVal}, `kinesis_customer_id` = {$custVal}, `kinesis_sync_status` = 'SYNCED', `kinesis_sync_time` = '{$currentTime}' WHERE `order_id` = '{$orderId}'");
 
-        // Also update ct_gcal_kinesis_sync
-        $syncCheck = mysqli_query($this->conn, "SELECT id FROM `ct_gcal_kinesis_sync` WHERE `local_order_id` = '{$orderId}' LIMIT 1");
-        if ($syncCheck && mysqli_num_rows($syncCheck) > 0) {
-            mysqli_query($this->conn, "UPDATE `ct_gcal_kinesis_sync` SET `kinesis_customer_id` = {$custVal}, `kinesis_appointment_id` = {$apptVal}, `sync_status` = 'SYNCED', `last_sync_message` = 'Synced to Kinesis API', `updated_at` = '{$currentTime}' WHERE `local_order_id` = '{$orderId}'");
-        } else {
-            $escSummary = mysqli_real_escape_string($this->conn, $customer['firstName'] . ' ' . $customer['lastName'] . ' - ' . $row['service_title']);
-            $escEmail = mysqli_real_escape_string($this->conn, $customer['email']);
-            $escPhone = mysqli_real_escape_string($this->conn, $customer['phoneNumber']);
-            $escName = mysqli_real_escape_string($this->conn, $customer['firstName'] . ' ' . $customer['lastName']);
-            $escStart = mysqli_real_escape_string($this->conn, $row['booking_date_time']);
-            $gEventId = mysqli_real_escape_string($this->conn, $row['gc_event_id']);
-            $localStaffId = 0;
-            if (!empty($row['staff_ids'])) {
-                $parts = explode(',', (string)$row['staff_ids']);
-                $localStaffId = (int)trim($parts[0]);
-            }
-
-            mysqli_query($this->conn, "INSERT INTO `ct_gcal_kinesis_sync` (
-                `google_event_id`, `local_order_id`, `local_booking_id`, `kinesis_customer_id`, `kinesis_appointment_id`,
-                `event_summary`, `event_start`, `customer_email`, `customer_phone`, `customer_name`, `customer_dob`,
-                `service_id`, `employee_id`, `sync_status`, `sync_action`, `last_sync_message`, `created_at`, `updated_at`
-            ) VALUES (
-                '{$gEventId}', '{$orderId}', '{$bookingId}', {$custVal}, {$apptVal},
-                '{$escSummary}', '{$escStart}', '{$escEmail}', '{$escPhone}', '{$escName}', '1990-01-01',
-                '{$extServiceId}', '{$localStaffId}', 'SYNCED', 'CREATE', 'Synced from Local System to Kinesis API', '{$currentTime}', '{$currentTime}'
-            )");
+        $localStaffId = 0;
+        if (!empty($row['staff_ids'])) {
+            $parts = explode(',', (string)$row['staff_ids']);
+            $localStaffId = (int)trim($parts[0]);
         }
+        $this->writeSyncLog($orderId, 'SYNCED', 'CREATE', 'Created booking on Kinesis API', array(
+            'appointment_id' => $kinesisApptId ? (int)$kinesisApptId : 0,
+            'customer_id' => $kinesisCustomerId ? (int)$kinesisCustomerId : 0,
+            'booking_id' => $bookingId,
+            'event_start' => $row['booking_date_time'],
+            'customer_email' => $customer['email'],
+            'customer_phone' => $customer['phoneNumber'],
+            'customer_name' => $customer['firstName'] . ' ' . $customer['lastName'],
+            'event_summary' => $customer['firstName'] . ' ' . $customer['lastName'] . ' - ' . $row['service_title'],
+            'service_id' => $extServiceId,
+            'employee_id' => $localStaffId,
+            'google_event_id' => isset($row['gc_event_id']) ? $row['gc_event_id'] : ''
+        ));
 
         return array(
             'success' => true,

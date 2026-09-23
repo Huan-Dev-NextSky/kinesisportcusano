@@ -34,7 +34,7 @@ $objdashboard->conn = $conn;
 $gc_hook = new cleanto_gcHook();
 $gc_hook->conn = $conn;
 
-/* Hard-delete booking: handle early so it cannot be blocked by later branches */
+/* Hard-delete booking: cancel Kinesis (+ GCal) first, then delete local */
 if (isset($_POST['delete_booking'])) {
 	$is_admin = isset($_SESSION['ct_adminid']);
 	if (!$is_admin) {
@@ -51,17 +51,55 @@ if (isset($_POST['delete_booking'])) {
 		echo "0";
 		exit;
 	}
-	/* Delete local records first (source of truth for UI) */
-	$objdashboard->delete_booking($id);
-	/* Best-effort remote cleanup; never block local delete */
+
+	$settings_early = new cleanto_setting();
+	$settings_early->conn = $conn;
+	$now = date('Y-m-d H:i:s');
+	$bkRes = @mysqli_query($conn, "SELECT `gc_event_id`, `gc_staff_event_id`, `staff_ids`, `kinesis_appointment_id`, `kinesis_customer_id` FROM `ct_bookings` WHERE `order_id` = {$id} LIMIT 1");
+	$bkRow = ($bkRes && mysqli_num_rows($bkRes) > 0) ? mysqli_fetch_assoc($bkRes) : null;
+	if ($bkRow) {
+		if ($gc_event_id === '' && !empty($bkRow['gc_event_id'])) {
+			$gc_event_id = $bkRow['gc_event_id'];
+		}
+		if ($gc_staff_event_id === '' && !empty($bkRow['gc_staff_event_id'])) {
+			$gc_staff_event_id = $bkRow['gc_staff_event_id'];
+		}
+		if ($pid === '' && !empty($bkRow['staff_ids'])) {
+			$pid = $bkRow['staff_ids'];
+		}
+	}
+	$_POST['gc_event_id'] = $gc_event_id;
+	$_POST['gc_staff_event_id'] = $gc_staff_event_id;
+	$_POST['pid'] = $pid;
+
+	/* Mark cancelled so remote cancel can run before local hard-delete */
+	@mysqli_query($conn, "UPDATE `ct_bookings` SET `booking_status` = 'CC', `kinesis_sync_status` = 'CANCEL_PENDING', `lastmodify` = '{$now}' WHERE `order_id` = {$id}");
+
+	$kinesis_ok = true;
+	try {
+		if ($settings_early->get_option('kinesis_api_status') === 'Y') {
+			require_once dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwAppointmentSync.php';
+			$apptSync = new AwwAppointmentSync($conn);
+			$syncRes = $apptSync->syncSingleBooking($id);
+			/* writeSyncLog inside sync updates the single CREATE row — no second log row */
+			if (empty($syncRes['success'])) {
+				$kinesis_ok = false;
+			}
+		}
+	} catch (Throwable $e) {
+		$kinesis_ok = false;
+	}
+
 	try {
 		if ($gc_hook->gc_purchase_status() == 'exist') {
-			@$gc_hook->gc_cancel_reject_booking_hook();
+			if ($settings_early->get_option('ct_gc_status_configure') == 'Y' && $settings_early->get_option('ct_gc_status') == 'Y') {
+				@$gc_hook->gc_cancel_reject_booking_hook();
+			}
 		}
 	} catch (Throwable $e) { }
-	try {
-		@mysqli_query($conn, "UPDATE `ct_gcal_kinesis_sync` SET `sync_status` = 'CANCELLED', `sync_action` = 'CANCEL', `last_sync_message` = 'Local booking deleted by admin', `updated_at` = NOW() WHERE `local_order_id` = {$id}");
-	} catch (Throwable $e) { }
+
+	$objdashboard->delete_booking($id);
+
 	header('Content-Type: text/plain; charset=utf-8');
 	echo "deleted";
 	exit;
@@ -3189,17 +3227,37 @@ elseif(isset($_POST['confirm_booking_cal'])){
 	$lastmodify = date('Y-m-d H:i:s');
 	$objdashboard->reject_bookings($id,$reason,$lastmodify);
 	@mysqli_query($conn, "UPDATE `ct_gcal_kinesis_sync` SET `sync_status` = 'CANCEL_PENDING', `sync_action` = 'CANCEL', `last_sync_message` = 'Rejected by admin', `updated_at` = NOW() WHERE `local_order_id` = " . (int)$id);
-	require_once(dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwAppointmentSync.php');
-	$kinesisSync = new AwwAppointmentSync($conn);
-	$kinesisSync->syncSingleBooking((int)$id);
-	$client_name = "";
-	$orderdetail = $objdashboard->getclientorder($id);
-  	$clientdetail = $objdashboard->clientemailsender($id);
+	$kinesis_reject_error = '';
+	if ($settings->get_option('kinesis_api_status') === 'Y') {
+		try {
+			require_once(dirname(dirname(dirname(__FILE__))) . '/integrations/awwapi/AwwAppointmentSync.php');
+			$kinesisSync = new AwwAppointmentSync($conn);
+			$syncRes = $kinesisSync->syncSingleBooking((int)$id);
+			if (empty($syncRes['success']) && !empty($syncRes['error'])) {
+				$kinesis_reject_error = $syncRes['error'];
+			}
+		} catch (Exception $e) {
+			$kinesis_reject_error = $e->getMessage();
+		}
+	}
 	$pid = $_POST['pid'];
 	$gc_staff_event_id = $_POST['gc_staff_event_id'];
 	if($gc_hook->gc_purchase_status() == 'exist'){
-		echo $gc_hook->gc_cancel_reject_booking_hook();
+		@$gc_hook->gc_cancel_reject_booking_hook();
 	}
+	if ($kinesis_reject_error !== '') {
+		header('Content-Type: application/json; charset=utf-8');
+		echo json_encode(array(
+			'ok' => true,
+			'rejected' => true,
+			'kinesis_ok' => false,
+			'warning' => $kinesis_reject_error
+		));
+		exit;
+	}
+	$client_name = "";
+	$orderdetail = $objdashboard->getclientorder($id);
+  	$clientdetail = $objdashboard->clientemailsender($id);
 	$admin_company_name = $settings->get_option('ct_company_name');
 	$setting_date_format = $settings->get_option('ct_date_picker_date_format');
 	$setting_time_format = $settings->get_option('ct_time_format');

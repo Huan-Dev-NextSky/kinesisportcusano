@@ -158,14 +158,14 @@ class cleanto_adminprofile {
 		return $result;
 	} */
 	public function get_service_acc_provider() {
-        $query = "SELECT id FROM ct_admin_info WHERE FIND_IN_SET(?, service_ids)";
-        $stmt = $this->conn->prepare($query);
-        $stmt->bind_param("i", $this->staff_select_according_service);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $ids = [];
-        while ($row = $result->fetch_assoc()) {
-            $ids[] = $row['id'];
+        /* service_ids assignment removed — return all bookable Doctors */
+        $query = "SELECT `id` FROM `ct_admin_info` WHERE `enable_booking` = 'Y' AND `role` != 'admin' ORDER BY `id` ASC";
+        $result = mysqli_query($this->conn, $query);
+        $ids = array();
+        if ($result) {
+            while ($row = mysqli_fetch_assoc($result)) {
+                $ids[] = $row['id'];
+            }
         }
         return $ids;
     }
@@ -279,8 +279,8 @@ class cleanto_adminprofile {
   } 
   /*  display all staff available for reschedule booking */
 	public function readall_staff_for_reschedule($service_id){
-		$query  = "select * from `".$this->tablename."` where `role` = 'doctor' and `enable_booking` = 'Y' and `service_ids` like '%".$service_id."%'";
-		/*$query  = "select * from `".$this->tablename."` where tech_status!=1 and `role` = 'doctor' and `enable_booking` = 'Y' and `zone` = '".$zone."' and `service_ids` like '%".$service_id."%'";*/
+		/* service_ids assignment removed — any bookable Doctor can be chosen */
+		$query  = "select * from `".$this->tablename."` where `role` != 'admin' and `enable_booking` = 'Y' ORDER BY `id` ASC";
 		$result=mysqli_query($this->conn,$query);
 		return $result;
 	}	

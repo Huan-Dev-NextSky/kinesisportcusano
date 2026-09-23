@@ -252,6 +252,14 @@ elseif(isset($_POST['action']) && $_POST['action']=='logout'){
         echo "logout successful";
     }
 }
+/* Cup24 one-step: reset Cleanto cart when switching service */
+elseif(isset($_POST['ksc_reset_cart']))
+{
+	$_SESSION['ct_cart'] = array('method' => array());
+	header('Content-Type: application/json; charset=utf-8');
+	echo json_encode(array('ok' => 1));
+	exit;
+}
 /* get methods in dropdown on click of service */
 elseif(isset($_POST['operationgetmethods']))
 {
@@ -880,11 +888,20 @@ elseif(isset($_POST['get_service_addons'])) {
 } elseif(isset($_POST['select_s_m_units_design'])){
     /* $service_array = array("method"=>array());
     $_SESSION['ct_cart'] = $service_array; */
-    echo $design_values = $objservice_method_design->get_service_methods_design($_POST['service_methods_id']);
+    $design_values = $objservice_method_design->get_service_methods_design($_POST['service_methods_id']);
+    if ($design_values === '' || (int)$design_values <= 0) {
+        $design_values = '3';
+    }
+    echo $design_values;
 } elseif(isset($_POST['s_m_units_maxlimit'])){
     $objservice_method_unit->services_id = $_POST['service_id'];
     $objservice_method_unit->methods_id = $_POST['method_id'];
-    $unt_values = $objservice_method_unit->get_maxlimit_by_service_methods_ids();
+    $unt_res = $objservice_method_unit->get_maxlimit_by_service_methods_ids();
+    $unt_values = ($unt_res instanceof mysqli_result) ? mysqli_fetch_assoc($unt_res) : $unt_res;
+    if (!$unt_values || empty($unt_values['id'])) {
+        echo '';
+        exit;
+    }
 	$mmnameee = 'ad_unit'.$unt_values['id'];
 
     $fe = 0;
